@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.PaymentSmsTracker" parent="Theme.Material3.DayNight.NoActionBar">
+    </style>
+
+    <style name="Theme.PaymentSmsTracker" parent="Base.Theme.PaymentSmsTracker" />
+
+    <!-- If you want to force edge-to-edge specifically for this activity's theme
+         or if you have a separate theme for it. -->
+    <style name="Theme.PaymentSmsTracker.EdgeToEdge" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" >true</item>
+
+        <!-- For API 29+ -->
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="q">shortEdges</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="q">false</item>
+    </style>
+
+    <!-- Base application theme. -->
+    <!-- <style name="Theme.PaymentSmsTracker" parent="Theme.Material3.DayNight.NoActionBar" -->
+</resources>
