@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">PaymentSmsTracker</string>
+    <string name="quick_start">Quick Start</string>
+    <string name="add_new_transaction">Add New Transaction</string>
+    <string name="view_all_transactions">View all Transactions</string>
+    <string name="setup_permissions">Setup Permissions</string>
+    <string name="enable_sms_notifications">Enable Sms Notifications</string>
+    <string name="enable_sms_permissions">Enable Sms Permissions</string>
+    <string name="payment_sms_tracker">Payment SMS Tracker !</string>
+    <string name="amount">Amount</string>
+    <string name="merchant_name">Merchant Name</string>
+    <string name="category">Category</string>
+    <string name="notes">Notes</string>
+    <string name="save_transaction">Save Transaction</string>
+    <string name="sms">SMS</string>
+    <string name="no_transactions_yet">No transactions yet!</string>
+    <string name="enable_notifications">Enable Notification Permissions</string>
+</resources>
