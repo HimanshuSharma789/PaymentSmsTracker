@@ -14,8 +14,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class TransactionAdapter :
-    ListAdapter<Transaction, TransactionAdapter.TransactionViewHolder>(TransactionDiffCallback()) {
+// 1. Define a click listener interface
+interface OnTransactionItemClickListener {
+    fun onTransactionItemClick(transactionId: Long)
+}
+
+class TransactionAdapter(
+    // 2. Add the listener to the constructor
+    private val itemClickListener: OnTransactionItemClickListener
+) : ListAdapter<Transaction, TransactionAdapter.TransactionViewHolder>(TransactionDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TransactionViewHolder {
         val view =
@@ -26,6 +33,10 @@ class TransactionAdapter :
     override fun onBindViewHolder(holder: TransactionViewHolder, position: Int) {
         val transaction = getItem(position)
         holder.bind(transaction)
+        // 3. Set the click listener on the item view
+        holder.itemView.setOnClickListener {
+            itemClickListener.onTransactionItemClick(transaction.id)
+        }
     }
 
     inner class TransactionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -36,18 +47,16 @@ class TransactionAdapter :
         private val notesTextView: TextView = itemView.findViewById(R.id.textViewNotes)
 
         fun bind(transaction: Transaction) {
-
             merchantTextView.text = transaction.merchantName
 
-            // Format amount as currency
-            val currencyFormat = NumberFormat.getCurrencyInstance() // Uses default locale
+            val currencyFormat = NumberFormat.getCurrencyInstance()
             amountTextView.text = currencyFormat.format(transaction.amount)
-            // You might want to color it red for debits, green for credits if you add transaction type
+            // Consider adding a visual cue for expense/income if your Transaction data class has it
 
             categoryTextView.text = "Category: ${transaction.category}"
 
-            // Format timestamp to a readable date
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
+//            val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
+            val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
             dateTextView.text = dateFormat.format(Date(transaction.timestamp))
 
             if (!transaction.notes.isNullOrEmpty()) {
@@ -66,6 +75,6 @@ class TransactionDiffCallback : DiffUtil.ItemCallback<Transaction>() {
     }
 
     override fun areContentsTheSame(oldItem: Transaction, newItem: Transaction): Boolean {
-        return oldItem == newItem // Relies on data class `equals`
+        return oldItem == newItem
     }
 }
