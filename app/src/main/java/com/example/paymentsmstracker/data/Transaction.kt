@@ -13,5 +13,8 @@ data class Transaction(
     val category: String,
     val notes: String?, // Nullable if notes are optional
     val timestamp: Long, // Store time as milliseconds (Unix time)
-    val originalSms: String? // Optional: to store the original SMS for reference
+    val originalSms: String?, // Optional: to store the original SMS for reference
+    val isExpense: Boolean = true, // Default to true, or determine from SMS
+    val referenceNumber: String? = null,
+    val lastUpdatedTimestamp: Long = System.currentTimeMillis()
 )

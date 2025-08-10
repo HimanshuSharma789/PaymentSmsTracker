@@ -1,9 +1,11 @@
 package com.example.paymentsmstracker.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow // For observing data changes
 
 @Dao
@@ -26,6 +28,12 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions")
     suspend fun deleteAllTransactions()
+
+    @Update
+    suspend fun updateTransaction(transaction: Transaction)
+
+    @Delete
+    suspend fun deleteTransaction(transaction: Transaction)
 
     // You can add more specific queries here, e.g., filter by category, date range, etc.
     @Query("SELECT * FROM transactions WHERE category = :categoryName ORDER BY timestamp DESC")

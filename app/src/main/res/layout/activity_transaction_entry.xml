@@ -12,8 +12,9 @@
         android:layout_height="wrap_content"
         android:fitsSystemWindows="true">
 
+        <!-- 1. Changed Toolbar ID -->
         <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
+            android:id="@+id/toolbar_transaction_entry"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/outline_arrow_back_24"
@@ -37,7 +38,7 @@
                 style="?attr/materialCardViewOutlinedStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="16dp"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -86,6 +87,26 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- 2. Added Date Picker Button -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/date"
+                android:textAppearance="?attr/textAppearanceLabelLarge"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonDate"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:paddingVertical="12dp"
+                android:gravity="center_vertical|start"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                app:icon="@drawable/outline_calendar_month_24"
+                tools:text="Oct 29, 2023"/>
+
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/textField_category"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
@@ -125,10 +146,28 @@
                 android:id="@+id/buttonSaveTransaction"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
+                android:layout_marginTop="24dp"
                 android:paddingVertical="12dp"
-                android:text="@string/save_transaction"
-                app:icon="@drawable/outline_arrow_downward_24" />
+                android:text="@string/save_transaction" />
+<!--                app:icon="@drawable/outline_save_24"-->
+            <!-- Changed icon to save -->
+
+
+            <!-- 3. Added Delete Button (Optional) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonDeleteTransaction"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:paddingVertical="12dp"
+                android:text="@string/delete_transaction"
+                android:textColor="?attr/colorError"
+                app:strokeColor="?attr/colorError"
+                android:visibility="gone"
+                tools:visibility="visible" />
+            <!--                app:icon="@drawable/outline_delete_24"-->
+            <!-- Initially gone, made visible in code for edit mode -->
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

@@ -16,4 +16,6 @@
     <string name="no_transactions_yet">No transactions yet!</string>
     <string name="enable_notifications">Enable Notification Permissions</string>
     <string name="export">Export</string>
+    <string name="date">Date</string>
+    <string name="delete_transaction">Delete Transaction</string>
 </resources>

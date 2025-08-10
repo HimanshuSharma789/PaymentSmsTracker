@@ -1,14 +1,18 @@
 package com.example.paymentsmstracker.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
     entities = [Transaction::class],
-    version = 1,
-    exportSchema = false
+    version = 2,
+//    exportSchema = false,
+//    autoMigrations = [
+//        AutoMigration (from = 1, to = 2)
+//    ]
 ) // Increment version on schema changes
 abstract class AppDatabase : RoomDatabase() {
 
@@ -31,7 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     // Wipes and rebuilds instead of migrating if no Migration object.
                     // Migration is not covered in this basic example.
-                    // .fallbackToDestructiveMigration() // Use with caution, for development
+                     .fallbackToDestructiveMigration() // Use with caution, for development
                     .build()
                 INSTANCE = instance
                 // return instance
