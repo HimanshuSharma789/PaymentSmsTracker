@@ -98,6 +98,12 @@
     <string name="export_all_raw">Export All (Raw CSV)</string>
     <string name="export_reviewed_mm">Export Reviewed → Money Manager TSV</string>
     <string name="export_splitwise">Export Splits → Splitwise CSV</string>
+    <string name="menu_export_mm">Export → Money Manager</string>
+    <string name="menu_export_splitwise">Export → Splitwise</string>
+    <string name="list_count_to_review">%1$d to review</string>
+    <string name="list_count_reviewed">%1$d reviewed</string>
+    <string name="list_count_exported">%1$d exported</string>
+    <string name="list_count_items">%1$d items</string>
     <string name="export_splits_only">Export Split Ledger CSV</string>
     <string name="clear_all_transactions">Clear All Transactions</string>
     <string name="filter_needs_review">Needs review</string>

@@ -25,7 +25,6 @@ import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.example.paymentsmstracker.viewmodel.TransactionListViewModel
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
@@ -120,15 +119,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         transactionListViewModel.setFilter(initialFilter)
         checkFilterChip(initialFilter)
         setupFilterChips()
-
-        findViewById<MaterialButton>(R.id.buttonExportReviewed).setOnClickListener {
-            exportReviewedToMoneyManager()
-        }
-        findViewById<MaterialButton>(R.id.buttonExportSplitwise).setOnClickListener {
-            exportSplitwise()
-        }
-
         setupRecyclerView()
+        transactionAdapter.setListFilter(initialFilter)
         observeViewModel()
     }
 
@@ -145,6 +137,14 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             R.id.action_select_transactions -> {
                 startSelectionMode()
+                true
+            }
+            R.id.action_export_mm -> {
+                exportReviewedToMoneyManager()
+                true
+            }
+            R.id.action_export_splitwise -> {
+                exportSplitwise()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -167,6 +167,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 findViewById<Chip>(R.id.chipAll).isChecked = true
             }
             transactionListViewModel.setFilter(filter)
+            transactionAdapter.setListFilter(filter)
             if (transactionAdapter.isSelectionMode()) {
                 actionMode?.finish()
             }
@@ -189,13 +190,16 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     private fun observeViewModel() {
         transactionListViewModel.allTransactions.observe(this) { transactions ->
+            val filter = transactionListViewModel.currentFilter()
+            transactionAdapter.setListFilter(filter)
             if (transactions.isNullOrEmpty()) {
                 recyclerView.visibility = View.GONE
                 emptyStateTextView.visibility = View.VISIBLE
-                emptyStateTextView.text = when (transactionListViewModel.currentFilter()) {
+                emptyStateTextView.text = when (filter) {
                     ListFilter.MM_EXPORTED -> getString(R.string.no_mm_exported)
                     else -> getString(R.string.no_transactions_yet)
                 }
+                updateListSubtitle(0, filter)
                 if (transactionAdapter.isSelectionMode()) {
                     actionMode?.finish()
                 }
@@ -203,7 +207,18 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 recyclerView.visibility = View.VISIBLE
                 emptyStateTextView.visibility = View.GONE
                 transactionAdapter.submitList(transactions)
+                updateListSubtitle(transactions.size, filter)
             }
+        }
+    }
+
+    private fun updateListSubtitle(count: Int, filter: ListFilter) {
+        supportActionBar?.subtitle = when {
+            count <= 0 -> null
+            filter == ListFilter.NEEDS_REVIEW -> getString(R.string.list_count_to_review, count)
+            filter == ListFilter.REVIEWED -> getString(R.string.list_count_reviewed, count)
+            filter == ListFilter.MM_EXPORTED -> getString(R.string.list_count_exported, count)
+            else -> getString(R.string.list_count_items, count)
         }
     }
 

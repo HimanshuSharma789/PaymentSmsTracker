@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.paymentsmstracker.R
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.google.android.material.checkbox.MaterialCheckBox
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -28,10 +29,17 @@ class TransactionAdapter(
 
     private var selectionMode = false
     private val selectedIds = linkedSetOf<Long>()
+    private var listFilter: ListFilter = ListFilter.NEEDS_REVIEW
 
     fun isSelectionMode(): Boolean = selectionMode
 
     fun selectedIds(): Set<Long> = selectedIds.toSet()
+
+    fun setListFilter(filter: ListFilter) {
+        if (listFilter == filter) return
+        listFilter = filter
+        notifyDataSetChanged()
+    }
 
     fun enterSelectionMode(initialId: Long? = null) {
         if (!selectionMode) {
@@ -101,7 +109,6 @@ class TransactionAdapter(
         private val amountTextView: TextView = itemView.findViewById(R.id.textViewAmount)
         private val groupDateTextView: TextView = itemView.findViewById(R.id.textViewGroupDate)
         private val categoryTextView: TextView = itemView.findViewById(R.id.textViewCategory)
-        private val dateTextView: TextView = itemView.findViewById(R.id.textViewDate)
         private val notesTextView: TextView = itemView.findViewById(R.id.textViewNotes)
         private val statusTextView: TextView = itemView.findViewById(R.id.textViewStatus)
         private val checkBox: MaterialCheckBox = itemView.findViewById(R.id.checkSelectTransaction)
@@ -136,14 +143,17 @@ class TransactionAdapter(
             }
             categoryTextView.text = categoryLabel
 
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-            dateTextView.text = dateFormat.format(Date(transaction.timestamp))
-
-            statusTextView.text = when (transaction.reviewStatus) {
-                ReviewStatus.NEEDS_REVIEW -> "Needs review"
-                ReviewStatus.REVIEWED -> "Reviewed"
-                ReviewStatus.EXPORTED -> "MM exported"
-                else -> transaction.reviewStatus
+            val showStatus = listFilter == ListFilter.TODAY || listFilter == ListFilter.ALL
+            if (showStatus) {
+                statusTextView.visibility = View.VISIBLE
+                statusTextView.text = when (transaction.reviewStatus) {
+                    ReviewStatus.NEEDS_REVIEW -> "Needs review"
+                    ReviewStatus.REVIEWED -> "Reviewed"
+                    ReviewStatus.EXPORTED -> "MM exported"
+                    else -> transaction.reviewStatus
+                }
+            } else {
+                statusTextView.visibility = View.GONE
             }
 
             if (!transaction.notes.isNullOrEmpty() || transaction.participants.isNotBlank()) {
