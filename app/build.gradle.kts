@@ -66,6 +66,9 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     // Optional - Kotlin Extensions and Coroutines support for Room
     implementation(libs.androidx.room.ktx)
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.status.pages)
     // Optional - Test helpers
     testImplementation(libs.androidx.room.testing)
 

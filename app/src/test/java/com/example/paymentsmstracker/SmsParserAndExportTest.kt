@@ -4,8 +4,10 @@ import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.export.SplitwiseExporter
+import com.example.paymentsmstracker.sms.SmsDedupe
 import com.example.paymentsmstracker.sms.SmsParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,6 +27,42 @@ class SmsParserAndExportTest {
         assertTrue(parsed.merchantName.contains("Instamart", ignoreCase = true))
         assertEquals("HDFC credit card", parsed.account)
         assertEquals("hdfc_card_spend", parsed.matchedRuleId)
+        val cal = Calendar.getInstance().apply { timeInMillis = parsed.timestamp }
+        assertEquals(2026, cal.get(Calendar.YEAR))
+        assertEquals(Calendar.JULY, cal.get(Calendar.MONTH))
+        assertEquals(26, cal.get(Calendar.DAY_OF_MONTH))
+        assertEquals(21, cal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(11, cal.get(Calendar.MINUTE))
+        assertEquals(36, cal.get(Calendar.SECOND))
+        assertTrue(parsed.timestampFromMessage)
+    }
+
+    @Test
+    fun usesReceivedTimeWhenSmsHasNoDate() {
+        val sms =
+            "Payment of Rs.50 done successfully Refno ABC123XYZ. Thank you for using debit card."
+        val receivedAt = java.util.GregorianCalendar(2026, Calendar.AUGUST, 1, 14, 30, 0).timeInMillis
+        val parsed = parser.parse(sms, receivedAtMs = receivedAt)
+        assertNotNull(parsed)
+        assertEquals(receivedAt, parsed!!.timestamp)
+        assertTrue(!parsed.timestampFromMessage)
+    }
+
+    @Test
+    fun dateOnlySmsKeepsDayAndUsesReceivedClock() {
+        val sms =
+            "Dear UPI user A/C X0539 debited by 1173.0 on date 01Mar25 trf to LAXMI MANJUNATH Refno 506087389221. If not u? call 1800111109. -SBI"
+        val receivedAt = java.util.GregorianCalendar(2025, Calendar.MARCH, 1, 18, 45, 12).timeInMillis
+        val parsed = parser.parse(sms, receivedAtMs = receivedAt)
+        assertNotNull(parsed)
+        val cal = Calendar.getInstance().apply { timeInMillis = parsed!!.timestamp }
+        assertEquals(1, cal.get(Calendar.DAY_OF_MONTH))
+        assertEquals(Calendar.MARCH, cal.get(Calendar.MONTH))
+        assertEquals(2025, cal.get(Calendar.YEAR))
+        assertEquals(18, cal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(45, cal.get(Calendar.MINUTE))
+        assertEquals(12, cal.get(Calendar.SECOND))
+        assertTrue(parsed!!.timestampFromMessage)
     }
 
     @Test
@@ -195,6 +233,50 @@ class SmsParserAndExportTest {
         assertTrue(ledger.contains("FriendsOwe"))
         assertTrue(ledger.contains("75.00"))
         assertTrue(ledger.contains("Equal"))
+    }
+
+    @Test
+    fun differentBankRefsAreNotDuplicatesEvenIfAmountAndMerchantMatch() {
+        val first = parser.parse(
+            "INR 1.00 is paid from HSBC account XXXXXX7006 to Kushagra  Mehta on 01-Aug-26 with ref 621372614292. If this is not done by you, call 18002673456 to report."
+        )
+        val second = parser.parse(
+            "INR 1.00 is paid from HSBC account XXXXXX7006 to Kushagra  Mehta on 01-Aug-26 with ref 212133500185. If this is not done by you, call 18002673456 to report."
+        )
+        assertNotNull(first)
+        assertNotNull(second)
+        assertEquals("621372614292", first!!.referenceNumber)
+        assertEquals("212133500185", second!!.referenceNumber)
+
+        val existing = listOf(
+            Transaction(
+                id = 1L,
+                amount = first.amount,
+                merchantName = first.merchantName,
+                account = first.account,
+                timestamp = first.timestamp,
+                originalSms = "INR 1.00 is paid from HSBC account XXXXXX7006 to Kushagra  Mehta on 01-Aug-26 with ref 621372614292. If this is not done by you, call 18002673456 to report.",
+                referenceNumber = first.referenceNumber,
+                reviewStatus = "needs_review",
+                transactionType = "Expense"
+            )
+        )
+        assertFalse(
+            SmsDedupe.isDuplicateAgainst(
+                existing = existing,
+                messageBody = "INR 1.00 is paid from HSBC account XXXXXX7006 to Kushagra  Mehta on 01-Aug-26 with ref 212133500185. If this is not done by you, call 18002673456 to report.",
+                parsed = second,
+                windowMinutes = 30
+            )
+        )
+        assertTrue(
+            SmsDedupe.isDuplicateAgainst(
+                existing = existing,
+                messageBody = existing.first().originalSms.orEmpty(),
+                parsed = first,
+                windowMinutes = 30
+            )
+        )
     }
 
     @Test

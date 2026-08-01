@@ -19,7 +19,7 @@
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorSurface"
             app:navigationIcon="@drawable/outline_arrow_back_24"
-            app:title="Transactions" />
+            app:title="@string/transactions" />
 
         <HorizontalScrollView
             android:layout_width="match_parent"

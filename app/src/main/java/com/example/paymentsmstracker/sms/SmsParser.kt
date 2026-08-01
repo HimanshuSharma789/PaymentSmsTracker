@@ -3,6 +3,7 @@ package com.example.paymentsmstracker.sms
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.SmsParseRule
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -15,7 +16,9 @@ data class ParsedSms(
     val isExpense: Boolean,
     val transactionType: String,
     val matchedRuleId: String?,
-    val matchedRuleName: String?
+    val matchedRuleName: String?,
+    /** True when calendar date (and optionally time) came from the SMS body. */
+    val timestampFromMessage: Boolean = false
 )
 
 class SmsParser(private val config: AppConfig) {
@@ -36,16 +39,24 @@ class SmsParser(private val config: AppConfig) {
         ).any { lower.contains(it) }
     }
 
-    fun parse(message: String): ParsedSms? {
+    /**
+     * @param receivedAtMs SMS inbox/received time. Used when the body has no usable date,
+     * or to supply time-of-day when the body has a date but no clock time.
+     */
+    fun parse(message: String, receivedAtMs: Long? = null): ParsedSms? {
         if (!looksLikePayment(message)) return null
 
         for (rule in config.smsParseRules.filter { it.enabled }) {
-            parseWithRule(message, rule)?.let { return it }
+            parseWithRule(message, rule, receivedAtMs)?.let { return it }
         }
-        return fallbackParse(message)
+        return fallbackParse(message, receivedAtMs)
     }
 
-    private fun parseWithRule(message: String, rule: SmsParseRule): ParsedSms? {
+    private fun parseWithRule(
+        message: String,
+        rule: SmsParseRule,
+        receivedAtMs: Long?
+    ): ParsedSms? {
         val pattern = try {
             Pattern.compile(rule.pattern)
         } catch (_: Exception) {
@@ -65,7 +76,13 @@ class SmsParser(private val config: AppConfig) {
         val dateRaw = namedGroup(matcher, "date")?.trim()
         val accountHint = namedGroup(matcher, "accountHint")?.trim().orEmpty()
 
-        val timestamp = parseDate(dateRaw, rule.dateFormat) ?: System.currentTimeMillis()
+        val resolved = resolveTimestamp(
+            dateRaw = dateRaw,
+            primaryFormat = rule.dateFormat,
+            message = message,
+            receivedAtMs = receivedAtMs
+        )
+
         val account = when {
             rule.defaultAccount.isNotBlank() -> rule.defaultAccount
             accountHint.isNotBlank() -> accountHint
@@ -90,17 +107,18 @@ class SmsParser(private val config: AppConfig) {
         return ParsedSms(
             amount = amount,
             merchantName = cleanedMerchant,
-            timestamp = timestamp,
+            timestamp = resolved.timestamp,
             referenceNumber = reference,
             account = account,
             isExpense = resolvedType != "Income",
             transactionType = resolvedType,
             matchedRuleId = rule.id,
-            matchedRuleName = rule.name
+            matchedRuleName = rule.name,
+            timestampFromMessage = resolved.fromMessage
         )
     }
 
-    private fun fallbackParse(message: String): ParsedSms? {
+    private fun fallbackParse(message: String, receivedAtMs: Long?): ParsedSms? {
         val amountPattern = Pattern.compile(
             """(?i)(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)"""
         )
@@ -110,18 +128,95 @@ class SmsParser(private val config: AppConfig) {
 
         val merchant = extractFallbackMerchant(message)
         val reference = extractFallbackReference(message)
+        val resolved = resolveTimestamp(
+            dateRaw = null,
+            primaryFormat = "",
+            message = message,
+            receivedAtMs = receivedAtMs
+        )
 
         return ParsedSms(
             amount = amount,
             merchantName = merchant,
-            timestamp = System.currentTimeMillis(),
+            timestamp = resolved.timestamp,
             referenceNumber = reference,
             account = "",
             isExpense = true,
             transactionType = "Expense",
             matchedRuleId = null,
-            matchedRuleName = "fallback"
+            matchedRuleName = "fallback",
+            timestampFromMessage = resolved.fromMessage
         )
+    }
+
+    private data class ResolvedTimestamp(
+        val timestamp: Long,
+        val fromMessage: Boolean
+    )
+
+    private fun resolveTimestamp(
+        dateRaw: String?,
+        primaryFormat: String,
+        message: String,
+        receivedAtMs: Long?
+    ): ResolvedTimestamp {
+        // 1) Prefer a full datetime embedded anywhere in the SMS body.
+        findDateTimeInMessage(message)?.let {
+            return ResolvedTimestamp(it, fromMessage = true)
+        }
+
+        // 2) Rule-captured date/time (date-only common for bank SMS).
+        parseDate(dateRaw, primaryFormat)?.let { parsed ->
+            if (dateRawHasTime(dateRaw)) {
+                return ResolvedTimestamp(parsed, fromMessage = true)
+            }
+            // Date-only: keep SMS calendar day, use received clock time when available.
+            val combined = if (receivedAtMs != null) {
+                combineDateWithTimeOfDay(parsed, receivedAtMs)
+            } else {
+                parsed
+            }
+            return ResolvedTimestamp(combined, fromMessage = true)
+        }
+
+        // 3) No usable date in SMS → SMS received time (or now).
+        return ResolvedTimestamp(
+            timestamp = receivedAtMs ?: System.currentTimeMillis(),
+            fromMessage = false
+        )
+    }
+
+    private fun dateRawHasTime(raw: String?): Boolean {
+        if (raw.isNullOrBlank()) return false
+        return raw.contains(':') || raw.contains('T')
+    }
+
+    private fun combineDateWithTimeOfDay(dateMillis: Long, timeOfDayMillis: Long): Long {
+        val dateCal = Calendar.getInstance().apply { timeInMillis = dateMillis }
+        val timeCal = Calendar.getInstance().apply { timeInMillis = timeOfDayMillis }
+        dateCal.set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY))
+        dateCal.set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE))
+        dateCal.set(Calendar.SECOND, timeCal.get(Calendar.SECOND))
+        dateCal.set(Calendar.MILLISECOND, timeCal.get(Calendar.MILLISECOND))
+        return dateCal.timeInMillis
+    }
+
+    private fun findDateTimeInMessage(message: String): Long? {
+        val patterns = listOf(
+            """\d{4}-\d{2}-\d{2}:\d{2}:\d{2}:\d{2}""" to "yyyy-MM-dd:HH:mm:ss",
+            """\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}""" to "yyyy-MM-dd HH:mm:ss",
+            """\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}""" to "yyyy-MM-dd'T'HH:mm:ss"
+        )
+        for ((regex, format) in patterns) {
+            val matcher = Pattern.compile(regex).matcher(message)
+            if (matcher.find()) {
+                val raw = matcher.group().replace('T', ' ')
+                val normalizedFormat =
+                    if (format.contains('T')) "yyyy-MM-dd HH:mm:ss" else format
+                parseDate(raw, normalizedFormat)?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun extractFallbackMerchant(message: String): String {
@@ -160,10 +255,14 @@ class SmsParser(private val config: AppConfig) {
 
     private fun parseDate(raw: String?, primaryFormat: String): Long? {
         if (raw.isNullOrBlank()) return null
+        val normalized = raw.trim().replace('T', ' ')
         val formats = buildList {
-            if (primaryFormat.isNotBlank()) add(primaryFormat)
+            if (primaryFormat.isNotBlank()) add(primaryFormat.replace('T', ' '))
             addAll(
                 listOf(
+                    "yyyy-MM-dd:HH:mm:ss",
+                    "yyyy-MM-dd HH:mm:ss",
+                    "yyyy-MM-dd HH:mm",
                     "yyyy-MM-dd",
                     "dd-MMM-yy",
                     "dd-MMM-yyyy",
@@ -185,16 +284,16 @@ class SmsParser(private val config: AppConfig) {
             try {
                 val sdf = SimpleDateFormat(format, Locale.ENGLISH)
                 sdf.isLenient = false
-                val parsed = sdf.parse(raw) ?: continue
+                val parsed = sdf.parse(normalized) ?: continue
                 // Formats without year default to 1970 — pin to current year.
                 if (!format.contains("y", ignoreCase = true)) {
-                    val cal = java.util.Calendar.getInstance().apply {
+                    val cal = Calendar.getInstance().apply {
                         time = parsed
-                        set(java.util.Calendar.YEAR, java.util.Calendar.getInstance().get(java.util.Calendar.YEAR))
+                        set(Calendar.YEAR, Calendar.getInstance().get(Calendar.YEAR))
                     }
                     // If that lands in the future by > few days (e.g. Dec SMS in Jan), use previous year.
                     if (cal.timeInMillis > System.currentTimeMillis() + 2L * 24 * 60 * 60 * 1000) {
-                        cal.add(java.util.Calendar.YEAR, -1)
+                        cal.add(Calendar.YEAR, -1)
                     }
                     return cal.timeInMillis
                 }

@@ -4,8 +4,11 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Telephony
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -19,6 +22,10 @@ import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.reminder.NightlyReviewScheduler
+import com.example.paymentsmstracker.server.LanAccessService
+import com.example.paymentsmstracker.server.LanServerState
+import com.example.paymentsmstracker.server.NetworkUtils
+import com.example.paymentsmstracker.sms.SmsDedupe
 import com.example.paymentsmstracker.sms.SmsParser
 import com.example.paymentsmstracker.theme.ThemeApplier
 import com.example.paymentsmstracker.theme.ThemeMode
@@ -33,7 +40,6 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
-import android.widget.TextView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,7 +48,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
+import kotlin.math.ceil
 
 class AdminActivity : AppCompatActivity() {
 
@@ -67,16 +73,35 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var textParseResult: android.widget.TextView
     private lateinit var panelBasics: View
     private lateinit var panelTheme: View
+    private lateinit var panelLaptop: View
     private lateinit var panelRules: View
     private lateinit var panelTest: View
     private lateinit var panelMaintenance: View
     private lateinit var chipGroupThemeMode: ChipGroup
     private lateinit var textThemeModeHint: TextView
+    private lateinit var chipGroupLanDuration: ChipGroup
+    private lateinit var switchLanRequireAccessCode: MaterialSwitch
+    private lateinit var textLanStatus: TextView
+    private lateinit var textLanUrl: TextView
+    private lateinit var textLanCode: TextView
+    private lateinit var textLanCountdown: TextView
+    private lateinit var textLanWarning: TextView
+    private lateinit var buttonLanStart: MaterialButton
+    private lateinit var buttonLanStop: MaterialButton
 
     private var nightlyHour: Int = 21
     private var nightlyMinute: Int = 0
     private var backfillFromDate: Long = 0L
     private var backfillToDate: Long = 0L
+    private val lanUiHandler = Handler(Looper.getMainLooper())
+    private val lanUiTicker = object : Runnable {
+        override fun run() {
+            refreshLanStatusUi()
+            if (LanServerState.get().running) {
+                lanUiHandler.postDelayed(this, 5_000L)
+            }
+        }
+    }
 
     private val requestReadSmsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -121,15 +146,26 @@ class AdminActivity : AppCompatActivity() {
         textParseResult = findViewById(R.id.textParseResult)
         panelBasics = findViewById(R.id.panelBasics)
         panelTheme = findViewById(R.id.panelTheme)
+        panelLaptop = findViewById(R.id.panelLaptop)
         panelRules = findViewById(R.id.panelRules)
         panelTest = findViewById(R.id.panelTest)
         panelMaintenance = findViewById(R.id.panelMaintenance)
         chipGroupThemeMode = findViewById(R.id.chipGroupThemeMode)
         textThemeModeHint = findViewById(R.id.textThemeModeHint)
+        chipGroupLanDuration = findViewById(R.id.chipGroupLanDuration)
+        switchLanRequireAccessCode = findViewById(R.id.switchLanRequireAccessCode)
+        textLanStatus = findViewById(R.id.textLanStatus)
+        textLanUrl = findViewById(R.id.textLanUrl)
+        textLanCode = findViewById(R.id.textLanCode)
+        textLanCountdown = findViewById(R.id.textLanCountdown)
+        textLanWarning = findViewById(R.id.textLanWarning)
+        buttonLanStart = findViewById(R.id.buttonLanStart)
+        buttonLanStop = findViewById(R.id.buttonLanStop)
 
         setupTabs()
         initializeBackfillDates()
         bindFromStore()
+        refreshLanStatusUi()
 
         switchMmFullSplitAsOwn.setOnCheckedChangeListener { _, _ ->
             updateDebtCategoryEnabled()
@@ -145,6 +181,13 @@ class AdminActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.buttonSaveBasics).setOnClickListener { saveBasics() }
         findViewById<MaterialButton>(R.id.buttonSaveTheme).setOnClickListener { saveTheme() }
+        buttonLanStart.setOnClickListener { startLanServer() }
+        buttonLanStop.setOnClickListener { stopLanServer() }
+        switchLanRequireAccessCode.setOnCheckedChangeListener { _, _ ->
+            if (!LanServerState.get().running) {
+                updateLanWarningText()
+            }
+        }
         findViewById<MaterialButton>(R.id.buttonSaveRules).setOnClickListener { saveRules() }
         findViewById<MaterialButton>(R.id.buttonResetConfig).setOnClickListener {
             AlertDialog.Builder(this)
@@ -196,6 +239,7 @@ class AdminActivity : AppCompatActivity() {
         val tabs = findViewById<TabLayout>(R.id.tabLayoutAdmin)
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_basics))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_theme))
+        tabs.addTab(tabs.newTab().setText(R.string.admin_tab_laptop))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_rules))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_test))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_maintenance))
@@ -210,9 +254,104 @@ class AdminActivity : AppCompatActivity() {
     private fun showPanel(index: Int) {
         panelBasics.visibility = if (index == 0) View.VISIBLE else View.GONE
         panelTheme.visibility = if (index == 1) View.VISIBLE else View.GONE
-        panelRules.visibility = if (index == 2) View.VISIBLE else View.GONE
-        panelTest.visibility = if (index == 3) View.VISIBLE else View.GONE
-        panelMaintenance.visibility = if (index == 4) View.VISIBLE else View.GONE
+        panelLaptop.visibility = if (index == 2) View.VISIBLE else View.GONE
+        panelRules.visibility = if (index == 3) View.VISIBLE else View.GONE
+        panelTest.visibility = if (index == 4) View.VISIBLE else View.GONE
+        panelMaintenance.visibility = if (index == 5) View.VISIBLE else View.GONE
+        if (index == 2) {
+            refreshLanStatusUi()
+            lanUiHandler.removeCallbacks(lanUiTicker)
+            if (LanServerState.get().running) {
+                lanUiHandler.post(lanUiTicker)
+            }
+        } else {
+            lanUiHandler.removeCallbacks(lanUiTicker)
+        }
+    }
+
+    private fun selectedLanDurationMinutes(): Int {
+        val checkedId = chipGroupLanDuration.checkedChipId
+        if (checkedId != View.NO_ID) {
+            val tag = findViewById<Chip>(checkedId).tag?.toString()?.toIntOrNull()
+            if (tag != null) return tag
+        }
+        return 30
+    }
+
+    private fun startLanServer() {
+        val host = NetworkUtils.localIpv4(this)
+        if (host.isNullOrBlank()) {
+            Toast.makeText(this, R.string.lan_need_wifi, Toast.LENGTH_LONG).show()
+            return
+        }
+        LanAccessService.start(
+            this,
+            selectedLanDurationMinutes(),
+            requireAccessCode = switchLanRequireAccessCode.isChecked
+        )
+        Toast.makeText(this, R.string.lan_started, Toast.LENGTH_SHORT).show()
+        lanUiHandler.postDelayed({
+            refreshLanStatusUi()
+            lanUiHandler.removeCallbacks(lanUiTicker)
+            lanUiHandler.post(lanUiTicker)
+        }, 400L)
+    }
+
+    private fun stopLanServer() {
+        LanAccessService.stop(this)
+        Toast.makeText(this, R.string.lan_stopped, Toast.LENGTH_SHORT).show()
+        lanUiHandler.postDelayed({ refreshLanStatusUi() }, 300L)
+    }
+
+    private fun updateLanWarningText(requireCode: Boolean = switchLanRequireAccessCode.isChecked) {
+        textLanWarning.setText(
+            if (requireCode) R.string.lan_warning else R.string.lan_warning_open
+        )
+    }
+
+    private fun refreshLanStatusUi() {
+        val state = LanServerState.get()
+        if (!state.running) {
+            textLanStatus.setText(R.string.lan_status_stopped)
+            textLanUrl.text = ""
+            textLanCode.text = ""
+            textLanCountdown.text = ""
+            buttonLanStart.isEnabled = true
+            buttonLanStop.isEnabled = false
+            chipGroupLanDuration.isEnabled = true
+            switchLanRequireAccessCode.isEnabled = true
+            updateLanWarningText()
+            return
+        }
+        textLanStatus.setText(R.string.lan_status_running)
+        textLanUrl.text = getString(R.string.lan_url_label, state.baseUrl)
+        textLanCode.text = if (state.accessCodeRequired) {
+            getString(R.string.lan_code_label, state.accessCode)
+        } else {
+            getString(R.string.lan_code_off)
+        }
+        val mins = ceil(state.remainingMs / 60_000.0).toInt().coerceAtLeast(0)
+        textLanCountdown.text = getString(R.string.lan_countdown, mins)
+        buttonLanStart.isEnabled = false
+        buttonLanStop.isEnabled = true
+        chipGroupLanDuration.isEnabled = false
+        switchLanRequireAccessCode.isEnabled = false
+        switchLanRequireAccessCode.isChecked = state.accessCodeRequired
+        updateLanWarningText(state.accessCodeRequired)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshLanStatusUi()
+        if (panelLaptop.visibility == View.VISIBLE && LanServerState.get().running) {
+            lanUiHandler.removeCallbacks(lanUiTicker)
+            lanUiHandler.post(lanUiTicker)
+        }
+    }
+
+    override fun onPause() {
+        lanUiHandler.removeCallbacks(lanUiTicker)
+        super.onPause()
     }
 
     private fun bindFromStore() {
@@ -667,31 +806,24 @@ class AdminActivity : AppCompatActivity() {
                 val body = cursor.getString(bodyIndex).orEmpty()
                 if (body.isBlank()) continue
                 val inboxDate = cursor.getLong(dateIndex)
-                val parsed = parser.parse(body) ?: continue
+                val parsed = parser.parse(body, receivedAtMs = inboxDate) ?: continue
                 parsedCount++
 
-                // Fallback parsing has no message date, so use the inbox date.
-                val effectiveParsed = if (parsed.matchedRuleId == null) {
-                    parsed.copy(timestamp = inboxDate)
-                } else {
-                    parsed
-                }
-
-                if (isBackfillDuplicate(existing, body, effectiveParsed, config.dedupeWindowMinutes)) {
+                if (SmsDedupe.isDuplicateAgainst(existing, body, parsed, config.dedupeWindowMinutes)) {
                     duplicates++
                     continue
                 }
 
                 val transaction = Transaction(
-                    amount = effectiveParsed.amount,
-                    merchantName = effectiveParsed.merchantName,
-                    account = effectiveParsed.account,
-                    timestamp = effectiveParsed.timestamp,
+                    amount = parsed.amount,
+                    merchantName = parsed.merchantName,
+                    account = parsed.account,
+                    timestamp = parsed.timestamp,
                     originalSms = body,
-                    isExpense = effectiveParsed.isExpense,
-                    referenceNumber = effectiveParsed.referenceNumber,
+                    isExpense = parsed.isExpense,
+                    referenceNumber = parsed.referenceNumber,
                     reviewStatus = ReviewStatus.NEEDS_REVIEW,
-                    transactionType = effectiveParsed.transactionType
+                    transactionType = parsed.transactionType
                 )
                 val id = dao.insertTransaction(transaction)
                 existing.add(transaction.copy(id = id))
@@ -706,38 +838,6 @@ class AdminActivity : AppCompatActivity() {
         val normalized = address.uppercase(Locale.ENGLISH)
         return KNOWN_BANK_SENDER_TOKENS.any { normalized.contains(it) }
     }
-
-    private fun isBackfillDuplicate(
-        existing: List<Transaction>,
-        body: String,
-        parsed: com.example.paymentsmstracker.sms.ParsedSms,
-        windowMinutes: Int
-    ): Boolean {
-        val normalizedBody = normalizeSms(body)
-        if (existing.any { normalizeSms(it.originalSms.orEmpty()) == normalizedBody }) {
-            return true
-        }
-
-        val reference = parsed.referenceNumber?.trim()
-        if (!reference.isNullOrBlank() && existing.any {
-                it.referenceNumber?.trim()?.equals(reference, ignoreCase = true) == true
-            }) {
-            return true
-        }
-
-        val windowMillis = TimeUnit.MINUTES.toMillis(windowMinutes.coerceAtLeast(0).toLong())
-        return existing.any {
-            abs(it.amount - parsed.amount) < 0.005 &&
-                normalizeMerchant(it.merchantName) == normalizeMerchant(parsed.merchantName) &&
-                abs(it.timestamp - parsed.timestamp) <= windowMillis
-        }
-    }
-
-    private fun normalizeSms(value: String): String =
-        value.trim().replace(Regex("\\s+"), " ").lowercase(Locale.ENGLISH)
-
-    private fun normalizeMerchant(value: String): String =
-        value.trim().replace(Regex("\\s+"), " ").lowercase(Locale.ENGLISH)
 
     private fun startOfDay(millis: Long): Long =
         Calendar.getInstance().apply {
