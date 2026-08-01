@@ -1,191 +1,345 @@
 package com.example.paymentsmstracker
 
+import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Observer
+import androidx.appcompat.view.ActionMode
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-// Make sure to import your click listener interface and the TransactionEntryActivity
 import com.example.paymentsmstracker.adapter.OnTransactionItemClickListener
 import com.example.paymentsmstracker.adapter.TransactionAdapter
+import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
+import com.example.paymentsmstracker.data.ReviewStatus
+import com.example.paymentsmstracker.export.MoneyManagerExporter
+import com.example.paymentsmstracker.export.SplitwiseExporter
+import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.example.paymentsmstracker.viewmodel.TransactionListViewModel
-import android.content.Context
-import android.content.Intent
-import kotlinx.coroutines.CoroutineScope
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
-// 1. Implement the OnTransactionItemClickListener interface
 class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListener {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyStateTextView: TextView
-    private lateinit var transactionAdapter: TransactionAdapter // Keep this type
-
+    private lateinit var transactionAdapter: TransactionAdapter
     private lateinit var db: AppDatabase
     private val transactionListViewModel: TransactionListViewModel by viewModels()
+    private var actionMode: ActionMode? = null
+
+    private val selectionActionModeCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+            mode.menuInflater.inflate(R.menu.transaction_selection_menu, menu)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+            return when (item.itemId) {
+                R.id.action_select_all -> {
+                    transactionAdapter.selectAllVisible()
+                    true
+                }
+                R.id.action_delete_selected -> {
+                    confirmDeleteSelected()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode) {
+            actionMode = null
+            transactionAdapter.exitSelectionMode()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_list)
 
-        val toolbar: androidx.appcompat.widget.Toolbar = findViewById(R.id.toolbarTransactionList)
+        val toolbar: MaterialToolbar = findViewById(R.id.toolbarTransactionList)
         setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        toolbar.setNavigationOnClickListener {
+            if (transactionAdapter.isSelectionMode()) {
+                actionMode?.finish()
+            } else {
+                finish()
+            }
+        }
 
         db = AppDatabase.getDatabase(applicationContext)
-
-        supportActionBar?.title = "History"
-        // supportActionBar?.setDisplayHomeAsUpEnabled(true) // Usually not needed for the main list screen
-
         recyclerView = findViewById(R.id.recyclerViewTransactions)
         emptyStateTextView = findViewById(R.id.textViewEmptyState)
+
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (transactionAdapter.isSelectionMode()) {
+                        actionMode?.finish()
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        )
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+            db.transactionDao().deleteExportedOlderThan(ReviewStatus.EXPORTED, cutoff)
+        }
+
+        val initialFilter = intent.getStringExtra(EXTRA_FILTER)?.let {
+            runCatching { ListFilter.valueOf(it) }.getOrNull()
+        } ?: ListFilter.NEEDS_REVIEW
+        if (intent.getStringExtra(EXTRA_FILTER) == "SPLITS") {
+            startActivity(Intent(this, SplitsActivity::class.java))
+        }
+        transactionListViewModel.setFilter(initialFilter)
+        checkFilterChip(initialFilter)
+        setupFilterChips()
+
+        findViewById<MaterialButton>(R.id.buttonExportReviewed).setOnClickListener {
+            exportReviewedToMoneyManager()
+        }
+        findViewById<MaterialButton>(R.id.buttonExportSplitwise).setOnClickListener {
+            exportSplitwise()
+        }
 
         setupRecyclerView()
         observeViewModel()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.transaction_list_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_open_splits -> {
+                startActivity(Intent(this, SplitsActivity::class.java))
+                true
+            }
+            R.id.action_select_transactions -> {
+                startSelectionMode()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun setupFilterChips() {
+        val group = findViewById<ChipGroup>(R.id.chipGroupFilter)
+        group.setOnCheckedStateChangeListener { _, checkedIds ->
+            val filter = when (checkedIds.firstOrNull()) {
+                R.id.chipNeedsReview -> ListFilter.NEEDS_REVIEW
+                R.id.chipToday -> ListFilter.TODAY
+                R.id.chipReviewed -> ListFilter.REVIEWED
+                R.id.chipMmExported -> ListFilter.MM_EXPORTED
+                R.id.chipAll -> ListFilter.ALL
+                null -> ListFilter.ALL
+                else -> ListFilter.ALL
+            }
+            if (checkedIds.isEmpty()) {
+                findViewById<Chip>(R.id.chipAll).isChecked = true
+            }
+            transactionListViewModel.setFilter(filter)
+            if (transactionAdapter.isSelectionMode()) {
+                actionMode?.finish()
+            }
+        }
+    }
+
+    private fun checkFilterChip(filter: ListFilter) {
+        findViewById<Chip>(R.id.chipNeedsReview).isChecked = filter == ListFilter.NEEDS_REVIEW
+        findViewById<Chip>(R.id.chipToday).isChecked = filter == ListFilter.TODAY
+        findViewById<Chip>(R.id.chipReviewed).isChecked = filter == ListFilter.REVIEWED
+        findViewById<Chip>(R.id.chipMmExported).isChecked = filter == ListFilter.MM_EXPORTED
+        findViewById<Chip>(R.id.chipAll).isChecked = filter == ListFilter.ALL
+    }
+
     private fun setupRecyclerView() {
-        // 2. Pass 'this' (the activity) as the click listener when creating the adapter
         transactionAdapter = TransactionAdapter(this)
         recyclerView.adapter = transactionAdapter
         recyclerView.layoutManager = LinearLayoutManager(this)
     }
 
     private fun observeViewModel() {
-        transactionListViewModel.allTransactions.observe(this, Observer { transactions ->
-            transactions?.let {
-                if (it.isEmpty()) {
-                    recyclerView.visibility = View.GONE
-                    emptyStateTextView.visibility = View.VISIBLE
-                } else {
-                    recyclerView.visibility = View.VISIBLE
-                    emptyStateTextView.visibility = View.GONE
-                    transactionAdapter.submitList(it)
-                }
-            } ?: run {
-                Log.d("TransactionList", "Observer received null transaction list.")
+        transactionListViewModel.allTransactions.observe(this) { transactions ->
+            if (transactions.isNullOrEmpty()) {
                 recyclerView.visibility = View.GONE
                 emptyStateTextView.visibility = View.VISIBLE
-            }
-        })
-    }
-
-    // 3. Implement the interface method
-    override fun onTransactionItemClick(transactionId: Long) {
-        val intent = Intent(this, TransactionEntryActivity::class.java).apply {
-            // Use the constant defined in TransactionEntryActivity
-            putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_ID, transactionId)
-        }
-        startActivity(intent)
-    }
-
-
-    suspend fun exportTransactionsToCsv(context: Context, db: AppDatabase): Boolean {
-        val TAG = "CsvExport"
-        // Ensure getAllTransactionsList() is a suspend function or called from a coroutine
-        val transactions = withContext(Dispatchers.IO) { // Example if getAllTransactionsList is suspend
-            db.transactionDao().getAllTransactionsList()
-        }
-
-
-        if (transactions.isEmpty()) {
-            Log.i(TAG, "No transactions to export.")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "No transactions to export.", Toast.LENGTH_SHORT).show()
-            }
-            return false
-        }
-
-        val fileTimestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(System.currentTimeMillis())
-        val fileName = "transactions_export_$fileTimestamp.csv"
-
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        // Your CSV generation logic (ensure it's robust, especially with quotes and commas in data)
-        val csvHeader = "ID,Amount,Merchant Name,Category,Notes,Timestamp,Original SMS\n"
-        val csvBody = transactions.joinToString(separator = "\n") { transaction ->
-            val id = transaction.id
-            val amount = transaction.amount
-            val merchantName = "\"${transaction.merchantName.replace("\"", "\"\"")}\"" // Escape quotes
-            val category = "\"${transaction.category.replace("\"", "\"\"")}\""
-            val notes = "\"${transaction.notes?.replace("\"", "\"\"") ?: ""}\""
-            val timestamp = sdf.format(Date(transaction.timestamp))
-            val originalSms = "\"${transaction.originalSms?.replace("\"", "\"\"") ?: ""}\""
-            "$id,$amount,$merchantName,$category,$notes,$timestamp,$originalSms"
-        }
-        val csvContent = csvHeader + csvBody
-
-        try {
-            // Assuming FileHandler().saveCsvFileToDownloads(...) is implemented correctly
-            // and handles permissions if necessary (e.g., using MediaStore for Android 10+)
-            FileHandler().saveCsvFileToDownloads(this, fileName, csvContent) // Consider making this suspend too
-            Log.i(TAG, "Successfully exported ${transactions.size} transactions to $fileName")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Exported to: $fileName", Toast.LENGTH_LONG).show()
-            }
-            return true
-        } catch (e: Exception) { // Catch broader exceptions during file saving
-            Log.e(TAG, "Error writing CSV file", e)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-            return false
-        }
-    }
-
-
-    private fun handleExportAction() {
-        CoroutineScope(Dispatchers.Main).launch { // Already on Main, IO for db/file access
-            val success = exportTransactionsToCsv(this@TransactionListActivity, db)
-            // No need to switch context for exportTransactionsToCsv if it handles its own IO
-            // val success = withContext(Dispatchers.IO) { // Not strictly needed here if exportTransactionsToCsv is well-defined
-            //     exportTransactionsToCsv(this@TransactionListActivity, db)
-            // }
-            if (success) {
-                Log.d("TransactionListActivity", "CSV Export successful call.")
+                emptyStateTextView.text = when (transactionListViewModel.currentFilter()) {
+                    ListFilter.MM_EXPORTED -> getString(R.string.no_mm_exported)
+                    else -> getString(R.string.no_transactions_yet)
+                }
+                if (transactionAdapter.isSelectionMode()) {
+                    actionMode?.finish()
+                }
             } else {
-                Log.d("TransactionListActivity", "CSV Export failed call.")
+                recyclerView.visibility = View.VISIBLE
+                emptyStateTextView.visibility = View.GONE
+                transactionAdapter.submitList(transactions)
             }
+        }
+    }
+
+    private fun startSelectionMode(initialId: Long? = null) {
+        if (actionMode == null) {
+            actionMode = startSupportActionMode(selectionActionModeCallback)
+        }
+        transactionAdapter.enterSelectionMode(initialId)
+    }
+
+    private fun confirmDeleteSelected() {
+        val ids = transactionAdapter.selectedIds()
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "No transactions selected", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete_selected_title)
+            .setMessage(getString(R.string.delete_selected_message, ids.size))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ -> deleteSelected(ids) }
+            .show()
+    }
+
+    private fun deleteSelected(ids: Set<Long>) {
+        lifecycleScope.launch {
+            val deleted = withContext(Dispatchers.IO) {
+                db.transactionDao().deleteTransactionsByIds(ids.toList())
+            }
+            Toast.makeText(
+                this@TransactionListActivity,
+                "Deleted $deleted transactions",
+                Toast.LENGTH_SHORT
+            ).show()
+            actionMode?.finish()
+        }
+    }
+
+    override fun onTransactionItemClick(transactionId: Long) {
+        startActivity(
+            Intent(this, TransactionEntryActivity::class.java).apply {
+                putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_ID, transactionId)
+            }
+        )
+    }
+
+    override fun onTransactionItemLongClick(transactionId: Long): Boolean {
+        startSelectionMode(transactionId)
+        return true
+    }
+
+    override fun onSelectionChanged(selectedCount: Int) {
+        actionMode?.title = getString(R.string.selected_count, selectedCount)
+        if (selectedCount == 0 && transactionAdapter.isSelectionMode()) {
+            actionMode?.title = getString(R.string.select_to_delete)
+        }
+    }
+
+    private fun exportReviewedToMoneyManager() {
+        lifecycleScope.launch {
+            val config = ConfigStore(this@TransactionListActivity).load()
+            val txs = withContext(Dispatchers.IO) {
+                db.transactionDao().getTransactionsByStatusList(ReviewStatus.REVIEWED)
+            }
+            if (txs.isEmpty()) {
+                Toast.makeText(
+                    this@TransactionListActivity,
+                    "No reviewed transactions",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            val tsv = MoneyManagerExporter.toTsv(txs, config)
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "money_manager_import_$stamp.tsv"
+            FileHandler().saveTextFile(
+                this@TransactionListActivity,
+                fileName,
+                tsv,
+                mimeType = "text/tab-separated-values"
+            )
+            withContext(Dispatchers.IO) {
+                db.transactionDao().updateStatusForIds(
+                    txs.map { it.id },
+                    ReviewStatus.EXPORTED,
+                    System.currentTimeMillis()
+                )
+            }
+            Toast.makeText(
+                this@TransactionListActivity,
+                "Moved ${txs.size} to MM exported → Downloads/$fileName",
+                Toast.LENGTH_LONG
+            ).show()
+            findViewById<Chip>(R.id.chipMmExported).isChecked = true
+        }
+    }
+
+    private fun exportSplitwise() {
+        lifecycleScope.launch {
+            val txs = withContext(Dispatchers.IO) {
+                db.transactionDao().getAllTransactionsList().filter {
+                    (it.reviewStatus == ReviewStatus.REVIEWED ||
+                        it.reviewStatus == ReviewStatus.EXPORTED) &&
+                        SplitwiseExporter.isSplit(it)
+                }
+            }
+            if (txs.isEmpty()) {
+                Toast.makeText(
+                    this@TransactionListActivity,
+                    "No reviewed split transactions",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            val csv = SplitwiseExporter.toCsv(txs, onlySplits = true)
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "splitwise_import_$stamp.csv"
+            FileHandler().saveCsvFileToDownloads(this@TransactionListActivity, fileName, csv)
+            Toast.makeText(
+                this@TransactionListActivity,
+                "Exported ${txs.size} splits → Downloads/$fileName",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        // If this is your top-level activity in this task flow,
-        // you might not need a back button or could just finish().
-        // For actual navigation, use NavController or finish().
-        onBackPressedDispatcher.onBackPressed()
-        return true
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.top_app_bar_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_export -> {
-                handleExportAction()
-                true
-            }
-            // Add other menu items here if needed
-            android.R.id.home -> { // Handle the Up button if setDisplayHomeAsUpEnabled(true)
-                onSupportNavigateUp()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+        if (transactionAdapter.isSelectionMode()) {
+            actionMode?.finish()
+            return true
         }
+        finish()
+        return true
+    }
+
+    companion object {
+        const val EXTRA_FILTER = "extra_list_filter"
     }
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_open_splits"
+        android:title="@string/open_splits_table"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_select_transactions"
+        android:icon="@drawable/outline_checklist_24"
+        android:title="@string/select_to_delete"
+        app:showAsAction="ifRoom" />
+</menu>
