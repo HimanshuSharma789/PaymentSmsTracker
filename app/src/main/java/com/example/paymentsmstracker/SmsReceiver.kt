@@ -19,6 +19,7 @@ import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.sms.ParsedSms
+import com.example.paymentsmstracker.sms.SmsDedupe
 import com.example.paymentsmstracker.sms.SmsParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 const val CHANNEL_ID = "transaction_sms_channel"
 
@@ -44,10 +44,14 @@ class SmsReceiver : BroadcastReceiver() {
             pendingResult.finish()
             return
         }
+        val receivedAtMs = messages
+            .mapNotNull { msg -> msg.timestampMillis.takeIf { it > 0L } }
+            .maxOrNull()
+            ?: System.currentTimeMillis()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                handleMessage(context.applicationContext, body)
+                handleMessage(context.applicationContext, body, receivedAtMs)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to handle SMS", e)
             } finally {
@@ -56,16 +60,20 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun handleMessage(context: Context, messageBody: String) {
+    private suspend fun handleMessage(
+        context: Context,
+        messageBody: String,
+        receivedAtMs: Long
+    ) {
         val config = ConfigStore(context).load()
         val parser = SmsParser(config)
-        val parsed = parser.parse(messageBody) ?: run {
+        val parsed = parser.parse(messageBody, receivedAtMs = receivedAtMs) ?: run {
             Log.d(tag, "SMS did not match payment patterns")
             return
         }
 
         val dao = AppDatabase.getDatabase(context).transactionDao()
-        if (isDuplicate(dao, messageBody, parsed, config.dedupeWindowMinutes)) {
+        if (SmsDedupe.isDuplicate(dao, messageBody, parsed, config.dedupeWindowMinutes)) {
             Log.i(tag, "Skipping duplicate SMS ref=${parsed.referenceNumber}")
             return
         }
@@ -93,22 +101,6 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         showNotification(context, parsed, messageBody, id)
-    }
-
-    private suspend fun isDuplicate(
-        dao: com.example.paymentsmstracker.data.TransactionDao,
-        messageBody: String,
-        parsed: ParsedSms,
-        windowMinutes: Int
-    ): Boolean {
-        if (dao.findByOriginalSms(messageBody) != null) return true
-
-        val ref = parsed.referenceNumber
-        if (!ref.isNullOrBlank()) {
-            if (dao.findByReference(ref) != null) return true
-        }
-        val since = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(windowMinutes.toLong())
-        return dao.findRecentDuplicate(parsed.amount, parsed.merchantName, since) != null
     }
 
     private fun showNotification(
@@ -150,7 +142,8 @@ class SmsReceiver : BroadcastReceiver() {
         notificationManager.createNotificationChannel(channel)
 
         val formattedDate =
-            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(parsed.timestamp))
+            SimpleDateFormat("dd MMM yyyy · h:mm a", Locale.getDefault())
+                .format(Date(parsed.timestamp))
         val contentText =
             "₹${parsed.amount} at ${parsed.merchantName} on $formattedDate. Tap to review."
 

@@ -95,8 +95,8 @@ data class AppConfig(
             SmsParseRule(
                 id = "hdfc_card_spend",
                 name = "HDFC Card Spend",
-                pattern = """(?i)Spent\s+Rs\.?\s*(?<amount>[\d,]+(?:\.\d{1,2})?)\s+On\s+HDFC.*?At\s+(?<merchant>.+?)\s+On\s+(?<date>\d{4}-\d{2}-\d{2})(?::\d{2}:\d{2}:\d{2})?""",
-                dateFormat = "yyyy-MM-dd",
+                pattern = """(?i)Spent\s+Rs\.?\s*(?<amount>[\d,]+(?:\.\d{1,2})?)\s+On\s+HDFC.*?At\s+(?<merchant>.+?)\s+On\s+(?<date>\d{4}-\d{2}-\d{2}(?::\d{2}:\d{2}:\d{2})?)""",
+                dateFormat = "yyyy-MM-dd:HH:mm:ss",
                 defaultAccount = "HDFC credit card"
             ),
             SmsParseRule(

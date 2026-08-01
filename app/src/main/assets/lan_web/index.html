@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Payment SMS Tracker</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="loginView" class="panel">
+      <h1>PC Manager</h1>
+      <p class="muted">Enter the 6-digit code shown in the Android Admin → PC Manager panel.</p>
+      <label>Access code
+        <input id="codeInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+      </label>
+      <button id="loginBtn" class="primary">Continue</button>
+      <p id="loginError" class="error" hidden></p>
+    </section>
+
+    <section id="mainView" hidden>
+      <header class="top">
+        <div>
+          <h1>Transactions</h1>
+          <p id="serverMeta" class="muted"></p>
+        </div>
+        <div class="topActions">
+          <a id="sheetLink" class="secondary btnLink" href="/sheet.html">Sheet view</a>
+          <button id="selectModeBtn" class="secondary">Select</button>
+          <button id="newBtn" class="primary">New</button>
+          <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+      </header>
+
+      <div class="filters">
+        <button data-status="needs_review" class="chip active">Needs review</button>
+        <button data-status="reviewed" class="chip">Reviewed</button>
+        <button data-status="" class="chip">All</button>
+      </div>
+      <div class="filterRow">
+        <input id="searchInput" type="search" placeholder="Search merchant, notes, amount, SMS…" />
+        <select id="filterAccount" aria-label="Account">
+          <option value="">All accounts</option>
+        </select>
+        <select id="filterCategory" aria-label="Category">
+          <option value="">All categories</option>
+        </select>
+        <select id="filterSubcategory" aria-label="Subcategory">
+          <option value="">All subcategories</option>
+        </select>
+        <button type="button" id="clearFiltersBtn" class="ghost">Clear</button>
+        <span id="filterCount" class="filterCount muted"></span>
+      </div>
+
+      <div id="bulkBar" class="bulkBar" hidden>
+        <span id="bulkCount" class="bulkCount">0 selected</span>
+        <div class="bulkActions">
+          <button type="button" id="bulkReviewBtn" class="primary">Mark reviewed</button>
+          <button type="button" id="bulkDeleteBtn" class="danger">Delete</button>
+          <button type="button" id="bulkClearBtn" class="ghost">Clear</button>
+        </div>
+      </div>
+
+      <div id="list" class="list"></div>
+      <p id="listEmpty" class="muted" hidden>No transactions</p>
+    </section>
+
+    <section id="editView" class="panel" hidden>
+      <header class="top">
+        <button id="backBtn" class="ghost">← Back</button>
+        <h1 id="editTitle">Edit</h1>
+      </header>
+
+      <form id="editForm" class="form">
+        <label>Amount
+          <input name="amount" type="number" step="0.01" min="0" required />
+        </label>
+        <label>Merchant
+          <input name="merchantName" required />
+        </label>
+        <label>Account
+          <select name="account" id="accountSelect"></select>
+        </label>
+        <label>Type
+          <select name="transactionType">
+            <option>Expense</option>
+            <option>Income</option>
+            <option>Transfer-Out</option>
+          </select>
+        </label>
+        <label>Category
+          <select name="category" id="categorySelect"></select>
+        </label>
+        <label>Subcategory
+          <select name="subcategory" id="subcategorySelect"></select>
+        </label>
+        <label>Date & time
+          <input name="date" type="datetime-local" required />
+        </label>
+        <label>Notes
+          <input name="notes" />
+        </label>
+        <fieldset>
+          <legend>Participants</legend>
+          <div id="participantChips" class="chips"></div>
+        </fieldset>
+        <label>Split mode
+          <select name="splitMode" id="splitModeSelect">
+            <option value="equal">equal</option>
+            <option value="exact">exact</option>
+            <option value="percent">percent</option>
+            <option value="weight">weight</option>
+          </select>
+        </label>
+        <div id="allocationBox" class="alloc" hidden></div>
+        <p id="editError" class="error" hidden></p>
+        <div class="row">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="reviewBtn" class="secondary">Mark reviewed</button>
+          <button type="button" id="deleteBtn" class="danger">Delete</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

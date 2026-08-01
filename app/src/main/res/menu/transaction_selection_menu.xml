@@ -2,12 +2,21 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_select_all"
-        android:title="@string/select_all"
-        app:showAsAction="never" />
+        android:id="@+id/action_mark_reviewed_selected"
+        android:icon="@drawable/outline_task_alt_24"
+        android:title="@string/mark_reviewed_selected"
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_delete_selected"
         android:icon="@drawable/outline_delete_24"
         android:title="@string/delete"
         app:showAsAction="always" />
+    <item
+        android:id="@+id/action_select_all"
+        android:title="@string/select_all"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_cancel_selection"
+        android:title="@string/cancel_selection"
+        app:showAsAction="never" />
 </menu>

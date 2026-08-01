@@ -1,6 +1,7 @@
 package com.example.paymentsmstracker
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -521,7 +522,7 @@ class TransactionEntryActivity : AppCompatActivity() {
     }
 
     private fun updateDateButtonText() {
-        val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+        val sdf = SimpleDateFormat("MMM dd, yyyy · h:mm a", Locale.getDefault())
         dateButton.text = sdf.format(Date(selectedTimestamp))
     }
 
@@ -530,9 +531,26 @@ class TransactionEntryActivity : AppCompatActivity() {
         DatePickerDialog(
             this,
             { _, y, m, d ->
-                calendar.set(y, m, d)
+                calendar.set(Calendar.YEAR, y)
+                calendar.set(Calendar.MONTH, m)
+                calendar.set(Calendar.DAY_OF_MONTH, d)
                 selectedTimestamp = calendar.timeInMillis
                 updateDateButtonText()
+                TimePickerDialog(
+                    this,
+                    { _, hour, minute ->
+                        calendar.timeInMillis = selectedTimestamp
+                        calendar.set(Calendar.HOUR_OF_DAY, hour)
+                        calendar.set(Calendar.MINUTE, minute)
+                        calendar.set(Calendar.SECOND, 0)
+                        calendar.set(Calendar.MILLISECOND, 0)
+                        selectedTimestamp = calendar.timeInMillis
+                        updateDateButtonText()
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    false
+                ).show()
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),

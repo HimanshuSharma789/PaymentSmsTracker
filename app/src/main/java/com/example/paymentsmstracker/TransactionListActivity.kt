@@ -11,7 +11,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.view.ActionMode
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -39,49 +38,23 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyStateTextView: TextView
+    private lateinit var toolbar: MaterialToolbar
     private lateinit var transactionAdapter: TransactionAdapter
     private lateinit var db: AppDatabase
     private val transactionListViewModel: TransactionListViewModel by viewModels()
-    private var actionMode: ActionMode? = null
-
-    private val selectionActionModeCallback = object : ActionMode.Callback {
-        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-            mode.menuInflater.inflate(R.menu.transaction_selection_menu, menu)
-            return true
-        }
-
-        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
-
-        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-            return when (item.itemId) {
-                R.id.action_select_all -> {
-                    transactionAdapter.selectAllVisible()
-                    true
-                }
-                R.id.action_delete_selected -> {
-                    confirmDeleteSelected()
-                    true
-                }
-                else -> false
-            }
-        }
-
-        override fun onDestroyActionMode(mode: ActionMode) {
-            actionMode = null
-            transactionAdapter.exitSelectionMode()
-        }
-    }
+    private var selectionModeActive = false
+    private var lastListCount: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_list)
 
-        val toolbar: MaterialToolbar = findViewById(R.id.toolbarTransactionList)
+        toolbar = findViewById(R.id.toolbarTransactionList)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener {
-            if (transactionAdapter.isSelectionMode()) {
-                actionMode?.finish()
+            if (selectionModeActive) {
+                exitSelectionMode()
             } else {
                 finish()
             }
@@ -95,8 +68,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (transactionAdapter.isSelectionMode()) {
-                        actionMode?.finish()
+                    if (selectionModeActive) {
+                        exitSelectionMode()
                     } else {
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
@@ -125,7 +98,12 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.transaction_list_menu, menu)
+        val menuRes = if (selectionModeActive) {
+            R.menu.transaction_selection_menu
+        } else {
+            R.menu.transaction_list_menu
+        }
+        menuInflater.inflate(menuRes, menu)
         return true
     }
 
@@ -137,6 +115,22 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             R.id.action_select_transactions -> {
                 startSelectionMode()
+                true
+            }
+            R.id.action_select_all -> {
+                transactionAdapter.selectAllVisible()
+                true
+            }
+            R.id.action_mark_reviewed_selected -> {
+                confirmMarkReviewedSelected()
+                true
+            }
+            R.id.action_delete_selected -> {
+                confirmDeleteSelected()
+                true
+            }
+            R.id.action_cancel_selection -> {
+                exitSelectionMode()
                 true
             }
             R.id.action_export_mm -> {
@@ -168,8 +162,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             transactionListViewModel.setFilter(filter)
             transactionAdapter.setListFilter(filter)
-            if (transactionAdapter.isSelectionMode()) {
-                actionMode?.finish()
+            if (selectionModeActive) {
+                exitSelectionMode()
             }
         }
     }
@@ -200,8 +194,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                     else -> getString(R.string.no_transactions_yet)
                 }
                 updateListSubtitle(0, filter)
-                if (transactionAdapter.isSelectionMode()) {
-                    actionMode?.finish()
+                if (selectionModeActive) {
+                    exitSelectionMode()
                 }
             } else {
                 recyclerView.visibility = View.VISIBLE
@@ -213,6 +207,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     private fun updateListSubtitle(count: Int, filter: ListFilter) {
+        lastListCount = count
+        if (selectionModeActive) return
         supportActionBar?.subtitle = when {
             count <= 0 -> null
             filter == ListFilter.NEEDS_REVIEW -> getString(R.string.list_count_to_review, count)
@@ -223,10 +219,30 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     private fun startSelectionMode(initialId: Long? = null) {
-        if (actionMode == null) {
-            actionMode = startSupportActionMode(selectionActionModeCallback)
+        if (!selectionModeActive) {
+            selectionModeActive = true
+            invalidateOptionsMenu()
         }
         transactionAdapter.enterSelectionMode(initialId)
+        refreshSelectionTitle(transactionAdapter.selectedIds().size)
+    }
+
+    private fun exitSelectionMode() {
+        if (!selectionModeActive) return
+        selectionModeActive = false
+        transactionAdapter.exitSelectionMode()
+        supportActionBar?.title = getString(R.string.transactions)
+        updateListSubtitle(lastListCount, transactionListViewModel.currentFilter())
+        invalidateOptionsMenu()
+    }
+
+    private fun refreshSelectionTitle(selectedCount: Int) {
+        supportActionBar?.title = if (selectedCount == 0) {
+            getString(R.string.select_hint)
+        } else {
+            getString(R.string.selected_count, selectedCount)
+        }
+        supportActionBar?.subtitle = null
     }
 
     private fun confirmDeleteSelected() {
@@ -243,6 +259,22 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             .show()
     }
 
+    private fun confirmMarkReviewedSelected() {
+        val ids = transactionAdapter.selectedIds()
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "No transactions selected", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.mark_reviewed_selected_title)
+            .setMessage(getString(R.string.mark_reviewed_selected_message, ids.size))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.mark_reviewed_selected) { _, _ ->
+                markSelectedReviewed(ids)
+            }
+            .show()
+    }
+
     private fun deleteSelected(ids: Set<Long>) {
         lifecycleScope.launch {
             val deleted = withContext(Dispatchers.IO) {
@@ -253,7 +285,25 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 "Deleted $deleted transactions",
                 Toast.LENGTH_SHORT
             ).show()
-            actionMode?.finish()
+            exitSelectionMode()
+        }
+    }
+
+    private fun markSelectedReviewed(ids: Set<Long>) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                db.transactionDao().updateStatusForIds(
+                    ids.toList(),
+                    ReviewStatus.REVIEWED,
+                    System.currentTimeMillis()
+                )
+            }
+            Toast.makeText(
+                this@TransactionListActivity,
+                getString(R.string.mark_reviewed_selected_done, ids.size),
+                Toast.LENGTH_SHORT
+            ).show()
+            exitSelectionMode()
         }
     }
 
@@ -271,9 +321,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     override fun onSelectionChanged(selectedCount: Int) {
-        actionMode?.title = getString(R.string.selected_count, selectedCount)
-        if (selectedCount == 0 && transactionAdapter.isSelectionMode()) {
-            actionMode?.title = getString(R.string.select_to_delete)
+        if (selectionModeActive) {
+            refreshSelectionTitle(selectedCount)
         }
     }
 
@@ -346,8 +395,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        if (transactionAdapter.isSelectionMode()) {
-            actionMode?.finish()
+        if (selectionModeActive) {
+            exitSelectionMode()
             return true
         }
         finish()

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sheet · PC Manager</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app" class="wide">
+    <section id="loginView" class="panel">
+      <h1>PC Manager</h1>
+      <p class="muted">Enter the 6-digit code from Admin → PC Manager.</p>
+      <label>Access code
+        <input id="codeInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+      </label>
+      <button id="loginBtn" class="primary">Continue</button>
+      <p id="loginError" class="error" hidden></p>
+    </section>
+
+    <section id="sheetPage" hidden>
+      <header class="top">
+        <div>
+          <h1>Sheet view</h1>
+          <p id="serverMeta" class="muted">Edit cells, then Save on that row. Use Details for SMS and split.</p>
+        </div>
+        <div class="topActions">
+          <a class="ghost btnLink" href="/">← Cards</a>
+          <button id="refreshBtn" class="secondary">Refresh</button>
+          <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+      </header>
+
+      <div class="filters">
+        <button data-status="needs_review" class="chip active">Needs review</button>
+        <button data-status="reviewed" class="chip">Reviewed</button>
+        <button data-status="" class="chip">All</button>
+      </div>
+      <div class="filterRow">
+        <input id="searchInput" type="search" placeholder="Search merchant, notes, amount, SMS…" />
+        <select id="filterAccount" aria-label="Account">
+          <option value="">All accounts</option>
+        </select>
+        <select id="filterCategory" aria-label="Category">
+          <option value="">All categories</option>
+        </select>
+        <select id="filterSubcategory" aria-label="Subcategory">
+          <option value="">All subcategories</option>
+        </select>
+        <button type="button" id="clearFiltersBtn" class="ghost">Clear</button>
+        <span id="filterCount" class="filterCount muted"></span>
+      </div>
+
+      <div id="bulkBar" class="bulkBar" hidden>
+        <span id="bulkCount" class="bulkCount">0 selected</span>
+        <div class="bulkActions">
+          <button type="button" id="bulkSaveBtn" class="secondary">Save</button>
+          <button type="button" id="bulkReviewBtn" class="primary">Mark reviewed</button>
+          <button type="button" id="bulkDeleteBtn" class="danger">Delete</button>
+          <button type="button" id="bulkClearBtn" class="ghost">Clear</button>
+        </div>
+      </div>
+
+      <div id="sheetWrap" class="sheetWrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th class="checkCol">
+                <input id="selectAll" type="checkbox" title="Select all visible" aria-label="Select all" />
+              </th>
+              <th>Date</th>
+              <th>Merchant</th>
+              <th>Amount</th>
+              <th>Account</th>
+              <th>Category</th>
+              <th>Subcategory</th>
+              <th>Status</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sheetBody"></tbody>
+        </table>
+      </div>
+      <p id="listEmpty" class="muted" hidden>No transactions</p>
+    </section>
+  </div>
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <script src="/sheet.js"></script>
+</body>
+</html>

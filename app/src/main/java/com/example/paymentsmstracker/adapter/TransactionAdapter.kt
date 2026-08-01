@@ -132,6 +132,8 @@ class TransactionAdapter(
                         .format(Date(transaction.timestamp))
             }
 
+            val timeLabel = SimpleDateFormat("h:mm a", Locale.getDefault())
+                .format(Date(transaction.timestamp))
             val categoryLabel = buildString {
                 if (transaction.account.isNotBlank()) append(transaction.account)
                 if (transaction.category.isNotBlank()) {
@@ -140,6 +142,8 @@ class TransactionAdapter(
                     if (transaction.subcategory.isNotBlank()) append(" / ${transaction.subcategory}")
                 }
                 if (isEmpty()) append("Uncategorized")
+                if (isNotEmpty()) append(" · ")
+                append(timeLabel)
             }
             categoryTextView.text = categoryLabel
 

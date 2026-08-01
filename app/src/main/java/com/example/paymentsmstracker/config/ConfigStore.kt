@@ -109,12 +109,22 @@ class ConfigStore(context: Context) {
         } else {
             emptyList()
         }
-        // Keep user rules, and append any new built-in rules they don't have yet.
-        val existingIds = loadedRules.map { it.id }.toSet()
-        val rules = if (loadedRules.isEmpty()) {
+        // Keep user rules, append new built-ins, and refresh known built-in date patterns.
+        val defaultsById = AppConfig.DEFAULT_SMS_RULES.associateBy { it.id }
+        val refreshedLoaded = loadedRules.map { loaded ->
+            val def = defaultsById[loaded.id] ?: return@map loaded
+            // Keep custom edits unless this is a known stock date/time capture we improved.
+            if (loaded.id == "hdfc_card_spend") {
+                loaded.copy(pattern = def.pattern, dateFormat = def.dateFormat)
+            } else {
+                loaded
+            }
+        }
+        val existingIds = refreshedLoaded.map { it.id }.toSet()
+        val rules = if (refreshedLoaded.isEmpty()) {
             AppConfig.DEFAULT_SMS_RULES
         } else {
-            loadedRules + AppConfig.DEFAULT_SMS_RULES.filter { it.id !in existingIds }
+            refreshedLoaded + AppConfig.DEFAULT_SMS_RULES.filter { it.id !in existingIds }
         }
 
         return AppConfig(
