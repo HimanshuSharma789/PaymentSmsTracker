@@ -58,6 +58,7 @@ class TransactionEntryActivity : AppCompatActivity() {
 
     private lateinit var amountEditText: EditText
     private lateinit var merchantEditText: EditText
+    private lateinit var merchantInputLayout: TextInputLayout
     private lateinit var buttonPickAccount: MaterialButton
     private lateinit var buttonPickType: MaterialButton
     private lateinit var buttonPickCategory: MaterialButton
@@ -104,6 +105,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         val toolbar: androidx.appcompat.widget.Toolbar = findViewById(R.id.toolbar_transaction_entry)
         amountEditText = findViewById(R.id.editTextAmount)
         merchantEditText = findViewById(R.id.editTextMerchant)
+        merchantInputLayout = findViewById(R.id.textField_merchant)
         buttonPickAccount = findViewById(R.id.buttonPickAccount)
         buttonPickType = findViewById(R.id.buttonPickType)
         buttonPickCategory = findViewById(R.id.buttonPickCategory)
@@ -205,10 +207,12 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
     }
 
+    private fun isTransfer(): Boolean = selectedType == "Transfer-Out"
+
     private fun openAccountPicker(advanceAfterSelect: Boolean) {
         OptionPickerBottomSheet.show(
             this,
-            getString(R.string.account),
+            getString(if (isTransfer()) R.string.transfer_from else R.string.account),
             config.accounts,
             selectedAccount.ifBlank { null },
             spanCount = 2
@@ -232,6 +236,9 @@ class TransactionEntryActivity : AppCompatActivity() {
             selectedType = value
             selectedCategory = ""
             selectedSubcategory = ""
+            if (isTransfer()) {
+                clearSplitSelection()
+            }
             updatePickerLabels()
             if (advanceAfterSelect) {
                 buttonPickType.post { openCategoryPicker(advanceAfterSelect = true) }
@@ -242,12 +249,16 @@ class TransactionEntryActivity : AppCompatActivity() {
     private fun openCategoryPicker(advanceAfterSelect: Boolean) {
         val options = categoryOptionsForType()
         if (options.isEmpty()) {
-            Toast.makeText(this, "No categories available", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                if (isTransfer()) "No accounts available" else "No categories available",
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
         OptionPickerBottomSheet.show(
             this,
-            getString(R.string.category),
+            getString(if (isTransfer()) R.string.transfer_to else R.string.category),
             options,
             selectedCategory.ifBlank { null },
             spanCount = 2
@@ -264,6 +275,16 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun clearSplitSelection() {
+        for (i in 0 until chipGroupParticipants.childCount) {
+            (chipGroupParticipants.getChildAt(i) as? Chip)?.isChecked = false
+        }
+        selectSplitModeChip(SplitMode.EQUAL)
+        allocationInputs.clear()
+        containerMoreDetails.visibility = View.GONE
+        buttonToggleMore.setText(R.string.add_split)
     }
 
     private fun openSubcategoryPicker(advanceAfterSelect: Boolean) {
@@ -311,15 +332,31 @@ class TransactionEntryActivity : AppCompatActivity() {
     }
 
     private fun updatePickerLabels() {
-        buttonPickAccount.text = selectedAccount.ifBlank { getString(R.string.account) }
+        val transfer = isTransfer()
+        buttonPickAccount.text = selectedAccount.ifBlank {
+            getString(if (transfer) R.string.transfer_from else R.string.account)
+        }
         buttonPickType.text = selectedType.ifBlank { getString(R.string.transaction_type) }
-        buttonPickCategory.text = selectedCategory.ifBlank { getString(R.string.category) }
+        buttonPickCategory.text = selectedCategory.ifBlank {
+            getString(if (transfer) R.string.transfer_to else R.string.category)
+        }
         buttonPickSubcategory.text =
             selectedSubcategory.ifBlank { getString(R.string.subcategory) }
         val showSub = selectedType == "Expense" &&
             config.expenseCategories[selectedCategory].orEmpty().isNotEmpty()
+        buttonPickSubcategory.visibility = if (transfer) View.GONE else View.VISIBLE
         buttonPickSubcategory.isEnabled = showSub
         buttonPickSubcategory.alpha = if (showSub) 1f else 0.5f
+        if (transfer) {
+            (buttonPickCategory.layoutParams as? LinearLayout.LayoutParams)?.weight = 1f
+        }
+        merchantInputLayout.hint = getString(
+            if (transfer) R.string.transfer_description_optional else R.string.merchant_name
+        )
+        buttonToggleMore.visibility = if (transfer) View.GONE else View.VISIBLE
+        if (transfer) {
+            containerMoreDetails.visibility = View.GONE
+        }
     }
 
     private fun setupParticipantChips(selected: Set<String>) {
@@ -493,7 +530,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 selectSplitModeChip(selectedSplitMode)
                 rebuildAllocationRows()
                 refreshSplitUi()
-                if (tx.participants.isNotBlank()) {
+                if (!isTransfer() && tx.participants.isNotBlank()) {
                     containerMoreDetails.visibility = View.VISIBLE
                     buttonToggleMore.setText(R.string.hide_split)
                 }
@@ -560,9 +597,10 @@ class TransactionEntryActivity : AppCompatActivity() {
 
     private fun saveOrUpdateTransaction(markReviewed: Boolean) {
         val amountStr = amountEditText.text.toString()
-        val merchant = merchantEditText.text.toString().trim()
+        var merchant = merchantEditText.text.toString().trim()
         val notes = notesEditText.text.toString().trim()
-        val participants = selectedParticipants()
+        val transfer = isTransfer()
+        val participants = if (transfer) emptyList() else selectedParticipants()
 
         if (amountStr.isEmpty()) {
             amountEditText.error = "Required"; return
@@ -571,12 +609,28 @@ class TransactionEntryActivity : AppCompatActivity() {
         if (amount == null || amount <= 0) {
             amountEditText.error = "Invalid amount"; return
         }
-        if (merchant.isEmpty()) {
-            merchantEditText.error = "Required"; return
-        }
         if (selectedAccount.isBlank()) {
-            Toast.makeText(this, "Choose an account", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                if (transfer) "Choose From account" else "Choose an account",
+                Toast.LENGTH_SHORT
+            ).show()
             return
+        }
+        if (transfer) {
+            if (selectedCategory.isBlank()) {
+                Toast.makeText(this, "Choose To account", Toast.LENGTH_SHORT).show()
+                return
+            }
+            if (selectedAccount.equals(selectedCategory, ignoreCase = true)) {
+                Toast.makeText(this, "From and To must be different", Toast.LENGTH_SHORT).show()
+                return
+            }
+            if (merchant.isEmpty()) {
+                merchant = "Transfer to $selectedCategory"
+            }
+        } else if (merchant.isEmpty()) {
+            merchantEditText.error = "Required"; return
         }
         if (markReviewed && selectedType == "Expense" && selectedCategory.isBlank()) {
             Toast.makeText(this, "Choose a category", Toast.LENGTH_SHORT).show()
@@ -603,7 +657,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             amount = amount,
             merchantName = merchant,
             category = selectedCategory,
-            subcategory = selectedSubcategory,
+            subcategory = if (transfer) "" else selectedSubcategory,
             account = selectedAccount,
             notes = notes.ifEmpty { null },
             timestamp = selectedTimestamp,
@@ -611,8 +665,8 @@ class TransactionEntryActivity : AppCompatActivity() {
             isExpense = selectedType != "Income",
             referenceNumber = transactionToEdit?.referenceNumber ?: referenceFromIntent,
             participants = participants.joinToString(","),
-            splitMode = mode,
-            splitAllocations = SplitCalculator.encodeAllocations(allocations),
+            splitMode = if (transfer) SplitMode.EQUAL else mode,
+            splitAllocations = if (transfer) "" else SplitCalculator.encodeAllocations(allocations),
             reviewStatus = status,
             transactionType = selectedType,
             lastUpdatedTimestamp = System.currentTimeMillis()

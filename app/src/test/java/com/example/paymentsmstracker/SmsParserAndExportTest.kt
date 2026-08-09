@@ -38,6 +38,19 @@ class SmsParserAndExportTest {
     }
 
     @Test
+    fun parseAirtelPaymentsBankDebit() {
+        val body =
+            "Rs. 2200.00 debited from Airtel Payments Bank a/c Txn ID 297805887122 Bal:6073.82 Call 180023400 for help"
+        val parsed = parser.parse(body, receivedAtMs = 1_700_000_000_000L)
+        assertNotNull(parsed)
+        assertEquals(2200.0, parsed!!.amount, 0.001)
+        assertEquals("Airtel Payments Bank", parsed.merchantName)
+        assertEquals("297805887122", parsed.referenceNumber)
+        assertEquals("Airtel", parsed.account)
+        assertEquals("airtel_apb_debit", parsed.matchedRuleId)
+    }
+
+    @Test
     fun usesReceivedTimeWhenSmsHasNoDate() {
         val sms =
             "Payment of Rs.50 done successfully Refno ABC123XYZ. Thank you for using debit card."
@@ -209,6 +222,31 @@ class SmsParserAndExportTest {
         )
         val rows = MoneyManagerExporter.expandTransaction(tx, AppConfig())
         assertEquals("2026-12-30", rows.first().date)
+    }
+
+    @Test
+    fun transferOutExportsFromAccountAndToCategory() {
+        val tx = Transaction(
+            amount = 2500.0,
+            merchantName = "Transfer to Cash",
+            category = "Cash",
+            subcategory = "should-be-cleared",
+            account = "HSBC",
+            timestamp = java.util.GregorianCalendar(2026, java.util.Calendar.AUGUST, 9).timeInMillis,
+            participants = "ME,PUNEET",
+            reviewStatus = "reviewed",
+            transactionType = "Transfer-Out"
+        )
+        val rows = MoneyManagerExporter.expandTransaction(tx, AppConfig())
+        assertEquals(1, rows.size)
+        val row = rows.first()
+        assertEquals("HSBC", row.account)
+        assertEquals("Cash", row.category)
+        assertEquals("", row.subcategory)
+        assertEquals("Transfer-Out", row.incomeExpense)
+        assertEquals("2500.00", row.amount)
+        assertEquals("Transfer to Cash", row.description)
+        assertEquals("2026-08-09", row.date)
     }
 
     @Test

@@ -135,6 +135,13 @@ data class AppConfig(
                 defaultAccount = "SBI"
             ),
             SmsParseRule(
+                id = "airtel_apb_debit",
+                name = "Airtel Payments Bank Debit",
+                pattern = """(?i)Rs\.?\s*(?<amount>[\d,]+(?:\.\d{1,2})?)\s+debited\s+from\s+(?<merchant>Airtel Payments Bank).*?Txn\s*ID\s*(?<reference>\d+)""",
+                dateFormat = "",
+                defaultAccount = "Airtel"
+            ),
+            SmsParseRule(
                 id = "generic_paid_to_on",
                 name = "Generic Paid To On",
                 pattern = """(?i)(?:INR|Rs\.?|₹)\s*(?<amount>[\d,]+(?:\.\d{1,2})?).*?\bto\s+(?<merchant>.+?)\s+on\s+(?<date>\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}\s\w{3}\s\d{2,4}).*?(?:ref(?:erence)?\s*(?:no\.?)?\s*(?<reference>[\w.-]+))?""",

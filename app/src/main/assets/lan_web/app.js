@@ -151,13 +151,14 @@
     }).join("");
   }
 
+  function isTransferType(type) {
+    return (type || form.transactionType.value) === "Transfer-Out";
+  }
+
   function fillMetaControls() {
     const accountSelect = document.getElementById("accountSelect");
-    const categorySelect = document.getElementById("categorySelect");
     accountSelect.innerHTML = (meta.accounts || []).map((a) => `<option value="${a}">${a}</option>`).join("");
-    const cats = Object.keys(meta.expenseCategories || {});
-    categorySelect.innerHTML = [`<option value="">Uncategorized</option>`]
-      .concat(cats.map((c) => `<option value="${c}">${c}</option>`)).join("");
+    fillCategoryOptionsForType();
     const parts = document.getElementById("participantChips");
     parts.innerHTML = (meta.participants || []).map((p) =>
       `<label><input type="checkbox" value="${p}" /> ${p}</label>`
@@ -167,7 +168,50 @@
     });
   }
 
+  function fillCategoryOptionsForType() {
+    const categorySelect = document.getElementById("categorySelect");
+    const current = categorySelect.value;
+    if (isTransferType()) {
+      categorySelect.innerHTML = [`<option value="">Select To account</option>`]
+        .concat((meta.accounts || []).map((a) => `<option value="${a}">${a}</option>`)).join("");
+    } else if (form.transactionType.value === "Income") {
+      categorySelect.innerHTML = [`<option value="">Uncategorized</option>`]
+        .concat((meta.incomeCategories || []).map((c) => `<option value="${c}">${c}</option>`)).join("");
+    } else {
+      const cats = Object.keys(meta.expenseCategories || {});
+      categorySelect.innerHTML = [`<option value="">Uncategorized</option>`]
+        .concat(cats.map((c) => `<option value="${c}">${c}</option>`)).join("");
+    }
+    if ([...categorySelect.options].some((o) => o.value === current)) {
+      categorySelect.value = current;
+    }
+  }
+
+  function applyTypeFormUi() {
+    const transfer = isTransferType();
+    document.getElementById("accountLabel").childNodes[0].textContent = transfer ? "From" : "Account";
+    document.getElementById("categoryLabel").childNodes[0].textContent = transfer ? "To" : "Category";
+    document.getElementById("merchantLabel").childNodes[0].textContent =
+      transfer ? "Description (optional)" : "Merchant";
+    document.getElementById("subcategoryLabel").hidden = transfer;
+    document.getElementById("participantsFieldset").hidden = transfer;
+    document.getElementById("splitModeLabel").hidden = transfer;
+    if (transfer) {
+      allocationBox.hidden = true;
+      allocationBox.innerHTML = "";
+      document.querySelectorAll("#participantChips input").forEach((input) => {
+        input.checked = false;
+      });
+    }
+    fillCategoryOptionsForType();
+    if (!transfer) fillSubcategories();
+  }
+
   function fillSubcategories() {
+    if (isTransferType()) {
+      document.getElementById("subcategorySelect").innerHTML = `<option value=""></option>`;
+      return;
+    }
     const cat = form.category.value;
     const subs = (meta.expenseCategories && meta.expenseCategories[cat]) || [];
     const sel = document.getElementById("subcategorySelect");
@@ -233,6 +277,7 @@
     const account = document.getElementById("filterAccount")?.value || "";
     const category = document.getElementById("filterCategory")?.value || "";
     const subcategory = document.getElementById("filterSubcategory")?.value || "";
+    const type = document.getElementById("filterType")?.value || "";
     return items.filter((tx) => {
       if (!matchesTextSearch(tx, q)) return false;
       if (account && (tx.account || "") !== account) return false;
@@ -242,6 +287,7 @@
         return false;
       }
       if (subcategory && (tx.subcategory || "") !== subcategory) return false;
+      if (type && (tx.transactionType || "Expense") !== type) return false;
       return true;
     });
   }
@@ -257,18 +303,21 @@
     listEmpty.hidden = filtered.length > 0;
     updateFilterCount(filtered.length, items.length);
     listEl.innerHTML = filtered.map((tx) => {
-      const metaLine = [tx.account, tx.category].filter(Boolean).join(" · ") || "Uncategorized";
+      const type = tx.transactionType || "Expense";
+      const metaLine = type === "Transfer-Out"
+        ? `${tx.account || "?"} → ${tx.category || "?"}`
+        : ([tx.account, tx.category].filter(Boolean).join(" · ") || "Uncategorized");
       const st = tx.reviewStatus || "needs_review";
       const status = currentFilter ? "" : `<div class="status ${escapeHtml(st)}">${escapeHtml(st)}</div>`;
       const checked = selectedIds.has(String(tx.id));
       const check = selectMode
         ? `<input type="checkbox" class="itemCheck" ${checked ? "checked" : ""} aria-label="Select" />`
         : "";
-      return `<article class="item${selectMode ? " selectMode" : ""}${checked ? " selected" : ""}" data-id="${tx.id}" data-status="${escapeHtml(st)}">
+      return `<article class="item${selectMode ? " selectMode" : ""}${checked ? " selected" : ""}" data-id="${tx.id}" data-status="${escapeHtml(st)}" data-type="${escapeHtml(type)}">
         ${check}
         <div>
           <div class="merchant">${escapeHtml(tx.merchantName)}</div>
-          <div class="meta">${escapeHtml(metaLine)} · ${ymd(tx.timestamp)} ${formatTime(tx.timestamp)}</div>
+          <div class="meta"><span class="typePill ${escapeHtml(type)}">${escapeHtml(type)}</span> · ${escapeHtml(metaLine)} · ${ymd(tx.timestamp)} ${formatTime(tx.timestamp)}</div>
         </div>
         <div>
           <div class="amount">${money(tx.amount)}</div>
@@ -340,15 +389,16 @@
     form.reset();
     form.dataset.alloc = "";
     fillMetaControls();
+    let restoreCategory = "";
+    let restoreSubcategory = "";
     if (id) {
       const tx = await api(`/api/transactions/${id}`);
       form.amount.value = tx.amount;
       form.merchantName.value = tx.merchantName || "";
       form.account.value = tx.account || "";
       form.transactionType.value = tx.transactionType || "Expense";
-      form.category.value = tx.category || "";
-      fillSubcategories();
-      form.subcategory.value = tx.subcategory || "";
+      restoreCategory = tx.category || "";
+      restoreSubcategory = tx.subcategory || "";
       form.date.value = ymdHm(tx.timestamp);
       form.notes.value = tx.notes || "";
       form.splitMode.value = tx.splitMode || "equal";
@@ -359,29 +409,42 @@
       });
     } else {
       form.date.value = ymdHm(Date.now());
-      fillSubcategories();
       const me = document.querySelector('#participantChips input[value="ME"]');
       if (me) me.checked = true;
+    }
+    applyTypeFormUi();
+    if (restoreCategory) form.category.value = restoreCategory;
+    if (!isTransferType()) {
+      fillSubcategories();
+      if (restoreSubcategory) form.subcategory.value = restoreSubcategory;
     }
     rebuildAllocations();
     show("edit");
   }
 
   function collectBody() {
-    const people = selectedParticipants();
+    const transfer = isTransferType();
+    const people = transfer ? [] : selectedParticipants();
     const mode = form.splitMode.value;
     const alloc = {};
-    allocationBox.querySelectorAll("input[data-person]").forEach((input) => {
-      if (input.value !== "") alloc[input.dataset.person] = Number(input.value);
-    });
+    if (!transfer) {
+      allocationBox.querySelectorAll("input[data-person]").forEach((input) => {
+        if (input.value !== "") alloc[input.dataset.person] = Number(input.value);
+      });
+    }
     const d = form.date.value ? new Date(form.date.value) : new Date();
+    let merchantName = form.merchantName.value.trim();
+    const toAccount = form.category.value;
+    if (transfer && !merchantName && toAccount) {
+      merchantName = `Transfer to ${toAccount}`;
+    }
     return {
       amount: Number(form.amount.value),
-      merchantName: form.merchantName.value.trim(),
+      merchantName,
       account: form.account.value,
       transactionType: form.transactionType.value,
       category: form.category.value,
-      subcategory: form.subcategory.value,
+      subcategory: transfer ? "" : form.subcategory.value,
       notes: form.notes.value.trim(),
       timestamp: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
       participants: people,
@@ -425,10 +488,12 @@
       renderList();
     });
     document.getElementById("filterSubcategory").addEventListener("change", renderList);
+    document.getElementById("filterType").addEventListener("change", renderList);
     document.getElementById("clearFiltersBtn").onclick = () => {
       document.getElementById("searchInput").value = "";
       document.getElementById("filterAccount").value = "";
       document.getElementById("filterCategory").value = "";
+      document.getElementById("filterType").value = "";
       fillFilterSubcategories("");
       renderList();
     };
@@ -483,12 +548,26 @@
     };
     form.category.addEventListener("change", fillSubcategories);
     form.splitMode.addEventListener("change", rebuildAllocations);
+    form.transactionType.addEventListener("change", () => {
+      applyTypeFormUi();
+      rebuildAllocations();
+    });
 
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       editError.hidden = true;
       try {
         const body = collectBody();
+        if (body.transactionType === "Transfer-Out") {
+          if (!body.account || !body.category) {
+            throw new Error("Choose From and To accounts");
+          }
+          if (body.account.toLowerCase() === body.category.toLowerCase()) {
+            throw new Error("From and To must be different");
+          }
+        } else if (!body.merchantName) {
+          throw new Error("Merchant is required");
+        }
         if (editingId) {
           await api(`/api/transactions/${editingId}`, { method: "PUT", body: JSON.stringify(body) });
         } else {

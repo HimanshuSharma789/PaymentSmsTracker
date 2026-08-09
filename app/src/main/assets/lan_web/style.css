@@ -161,6 +161,28 @@ label { display: grid; gap: 6px; margin-bottom: 12px; font-weight: 600; font-siz
 .item .merchant { font-weight: 700; }
 .item .meta { color: var(--muted); font-size: 13px; }
 .item .amount { font-weight: 700; text-align: right; color: var(--accent); }
+.item[data-type="Income"] .amount { color: var(--ok); }
+.item[data-type="Transfer-Out"] .amount { color: #1d4ed8; }
+.typePill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.typePill.Income { background: var(--ok-soft); color: var(--ok); }
+.typePill.Transfer-Out { background: #eff6ff; color: #1d4ed8; }
+.sheet .typeSelect {
+  font-weight: 600;
+  min-width: 110px;
+}
+.sheet select[data-field="transactionType"] option[value="Expense"],
+.sheet tr .typeSelect { color: var(--amber); }
+.sheet select.typeSelect:has(option[value="Income"]:checked) { color: var(--ok); background: var(--ok-soft); }
+.sheet select.typeSelect:has(option[value="Transfer-Out"]:checked) { color: #1d4ed8; background: #eff6ff; }
+.sheet select.typeSelect:has(option[value="Expense"]:checked) { color: var(--amber); background: var(--amber-soft); }
 .item .status {
   font-size: 11px;
   font-weight: 700;

@@ -946,6 +946,9 @@ class AdminActivity : AppCompatActivity() {
             "UNION",
             "PAYTM",
             "AIRTEL",
+            // Airtel Payments Bank often uses AX-AIRBNK / AD-AIRBNK (not "AIRTEL")
+            "AIRBNK",
+            "AIRTELBANK",
             "PHONEPE",
             "GOOGLEPAY",
             "AMAZONPAY"

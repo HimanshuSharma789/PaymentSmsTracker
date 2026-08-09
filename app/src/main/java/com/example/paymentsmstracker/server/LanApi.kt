@@ -146,14 +146,9 @@ class LanApi(
         if (amount.isNaN() || amount <= 0.0) {
             return Parsed(error = "Amount must be greater than 0")
         }
-        val merchant = body.optString("merchantName", existing?.merchantName.orEmpty()).trim()
-        if (merchant.isEmpty()) {
-            return Parsed(error = "Merchant is required")
-        }
         val account = body.optString("account", existing?.account.orEmpty()).trim()
             .ifBlank { config.accounts.firstOrNull().orEmpty() }
         val category = body.optString("category", existing?.category.orEmpty()).trim()
-        val subcategory = body.optString("subcategory", existing?.subcategory.orEmpty()).trim()
         val notesRaw = if (body.has("notes")) body.optString("notes").trim() else existing?.notes
         val notes = notesRaw?.ifBlank { null }
         val timestamp = body.optLong("timestamp", existing?.timestamp ?: System.currentTimeMillis())
@@ -161,35 +156,74 @@ class LanApi(
             "transactionType",
             existing?.transactionType ?: "Expense"
         ).ifBlank { "Expense" }
+        val isTransfer = transactionType == "Transfer-Out"
         val reviewStatus = body.optString(
             "reviewStatus",
             existing?.reviewStatus ?: ReviewStatus.NEEDS_REVIEW
         ).ifBlank { ReviewStatus.NEEDS_REVIEW }
 
-        val participants = when {
-            body.has("participants") -> {
-                when (val raw = body.get("participants")) {
-                    is JSONArray -> buildList {
-                        for (i in 0 until raw.length()) {
-                            val v = raw.optString(i).trim()
-                            if (v.isNotEmpty()) add(v)
-                        }
-                    }
-                    else -> body.optString("participants")
-                        .split(',')
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
-                }
+        if (isTransfer) {
+            if (account.isBlank()) {
+                return Parsed(error = "Choose From account")
             }
-            else -> existing?.participantList().orEmpty()
+            if (category.isBlank()) {
+                return Parsed(error = "Choose To account")
+            }
+            if (account.equals(category, ignoreCase = true)) {
+                return Parsed(error = "From and To must be different")
+            }
         }
 
-        val splitMode = SplitMode.normalize(
-            body.optString("splitMode", existing?.splitMode ?: SplitMode.EQUAL)
-        )
-        val allocations = when {
-            body.has("splitAllocations") -> parseAllocationMap(body.get("splitAllocations"))
-            else -> SplitCalculator.parseAllocations(existing?.splitAllocations)
+        var merchant = body.optString("merchantName", existing?.merchantName.orEmpty()).trim()
+        if (merchant.isEmpty()) {
+            if (isTransfer) {
+                merchant = "Transfer to $category"
+            } else {
+                return Parsed(error = "Merchant is required")
+            }
+        }
+        val subcategory = if (isTransfer) {
+            ""
+        } else {
+            body.optString("subcategory", existing?.subcategory.orEmpty()).trim()
+        }
+
+        val participants = if (isTransfer) {
+            emptyList()
+        } else {
+            when {
+                body.has("participants") -> {
+                    when (val raw = body.get("participants")) {
+                        is JSONArray -> buildList {
+                            for (i in 0 until raw.length()) {
+                                val v = raw.optString(i).trim()
+                                if (v.isNotEmpty()) add(v)
+                            }
+                        }
+                        else -> body.optString("participants")
+                            .split(',')
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                    }
+                }
+                else -> existing?.participantList().orEmpty()
+            }
+        }
+
+        val splitMode = if (isTransfer) {
+            SplitMode.EQUAL
+        } else {
+            SplitMode.normalize(
+                body.optString("splitMode", existing?.splitMode ?: SplitMode.EQUAL)
+            )
+        }
+        val allocations = if (isTransfer) {
+            emptyMap()
+        } else {
+            when {
+                body.has("splitAllocations") -> parseAllocationMap(body.get("splitAllocations"))
+                else -> SplitCalculator.parseAllocations(existing?.splitAllocations)
+            }
         }
 
         if (participants.isNotEmpty() && splitMode != SplitMode.EQUAL) {

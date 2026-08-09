@@ -17,7 +17,51 @@
   const bulkBar = document.getElementById("bulkBar");
   const bulkCount = document.getElementById("bulkCount");
   const selectAll = document.getElementById("selectAll");
-  const COLSPAN = 10;
+  const COLSPAN = 11;
+
+  function typeOptions(selected) {
+    const cur = selected || "Expense";
+    return ["Expense", "Income", "Transfer-Out"].map((t) =>
+      `<option value="${t}" ${t === cur ? "selected" : ""}>${t}</option>`
+    ).join("");
+  }
+
+  function isTransferType(type) {
+    return type === "Transfer-Out";
+  }
+
+  function categoryChoices(type) {
+    if (isTransferType(type)) return meta.accounts || [];
+    if (type === "Income") return meta.incomeCategories || [];
+    return Object.keys(meta.expenseCategories || {});
+  }
+
+  function applyRowTypeUi(row, keepCategory) {
+    const type = row.querySelector('[data-field="transactionType"]')?.value || "Expense";
+    const transfer = isTransferType(type);
+    const catSel = row.querySelector('[data-field="category"]');
+    const subSel = row.querySelector('[data-field="subcategory"]');
+    const prev = keepCategory != null ? keepCategory : (catSel?.value || "");
+    if (catSel) {
+      catSel.innerHTML = optionList(categoryChoices(type), prev, true);
+      catSel.title = transfer ? "To account" : "Category";
+    }
+    if (subSel) {
+      subSel.disabled = transfer;
+      if (transfer) {
+        subSel.innerHTML = optionList([], "", true);
+      } else if (type === "Expense") {
+        const subs = (meta.expenseCategories && meta.expenseCategories[catSel.value]) || [];
+        const keepSub = subSel.value;
+        subSel.innerHTML = optionList(subs, keepSub, true);
+      } else {
+        subSel.innerHTML = optionList([], "", true);
+      }
+    }
+    const detail = detailRow(row.dataset.id);
+    const splitBlock = detail?.querySelector(".splitBlock");
+    if (splitBlock) splitBlock.hidden = transfer;
+  }
   let toastTimer = null;
 
   async function api(path, options = {}) {
@@ -138,6 +182,7 @@
     const account = document.getElementById("filterAccount")?.value || "";
     const category = document.getElementById("filterCategory")?.value || "";
     const subcategory = document.getElementById("filterSubcategory")?.value || "";
+    const type = document.getElementById("filterType")?.value || "";
     return items.filter((tx) => {
       if (!matchesTextSearch(tx, q)) return false;
       if (account && (tx.account || "") !== account) return false;
@@ -147,6 +192,7 @@
         return false;
       }
       if (subcategory && (tx.subcategory || "") !== subcategory) return false;
+      if (type && (tx.transactionType || "Expense") !== type) return false;
       return true;
     });
   }
@@ -421,9 +467,13 @@
     listEmpty.hidden = filtered.length > 0;
     updateFilterCount(filtered.length, items.length);
     const accounts = meta.accounts || [];
-    const categories = Object.keys(meta.expenseCategories || {});
     sheetBody.innerHTML = filtered.map((tx) => {
-      const subs = (meta.expenseCategories && meta.expenseCategories[tx.category]) || [];
+      const type = tx.transactionType || "Expense";
+      const transfer = isTransferType(type);
+      const categories = categoryChoices(type);
+      const subs = (!transfer && type === "Expense" && meta.expenseCategories)
+        ? (meta.expenseCategories[tx.category] || [])
+        : [];
       const sms = tx.originalSms || "";
       const open = expandedIds.has(String(tx.id));
       const checked = selectedIds.has(String(tx.id)) ? "checked" : "";
@@ -432,11 +482,12 @@
       <tr class="sheetMain${open ? " expanded" : ""}${checked ? " selected" : ""}" data-id="${tx.id}" data-status="${escapeHtml(st)}">
         <td class="checkCol"><input type="checkbox" class="rowCheck" ${checked} aria-label="Select row" /></td>
         <td><input class="dateInput" data-field="timestamp" type="datetime-local" value="${ymdHm(tx.timestamp)}" /></td>
-        <td><input data-field="merchantName" value="${escapeHtml(tx.merchantName || "")}" /></td>
+        <td><input data-field="merchantName" value="${escapeHtml(tx.merchantName || "")}" placeholder="${transfer ? "Description (optional)" : ""}" /></td>
         <td><input class="amountInput" data-field="amount" type="number" step="0.01" min="0" value="${tx.amount}" /></td>
-        <td><select data-field="account">${optionList(accounts, tx.account || "", false)}</select></td>
-        <td><select data-field="category">${optionList(categories, tx.category || "", true)}</select></td>
-        <td><select data-field="subcategory">${optionList(subs, tx.subcategory || "", true)}</select></td>
+        <td><select data-field="transactionType" class="typeSelect">${typeOptions(tx.transactionType)}</select></td>
+        <td><select data-field="account" title="${transfer ? "From" : "Account"}">${optionList(accounts, tx.account || "", false)}</select></td>
+        <td><select data-field="category" title="${transfer ? "To account" : "Category"}">${optionList(categories, tx.category || "", true)}</select></td>
+        <td><select data-field="subcategory" ${transfer ? "disabled" : ""}>${optionList(subs, transfer ? "" : (tx.subcategory || ""), true)}</select></td>
         <td>
           <select data-field="reviewStatus">
             <option value="needs_review" ${st === "needs_review" ? "selected" : ""}>needs_review</option>
@@ -460,7 +511,7 @@
                 <h3>Original SMS</h3>
                 <pre class="smsFull">${escapeHtml(sms || "No original SMS stored.")}</pre>
               </div>
-              <div class="detailBlock">
+              <div class="detailBlock splitBlock" ${transfer ? "hidden" : ""}>
                 <h3>Split</h3>
                 <p class="splitMeta">${escapeHtml(splitLabel(tx))}</p>
                 <p class="splitLiveError error" hidden></p>
@@ -496,9 +547,15 @@
         });
         el.addEventListener("change", () => {
           markDirty();
+          if (el.dataset.field === "transactionType") {
+            applyRowTypeUi(row, "");
+          }
           if (el.dataset.field === "category") {
-            const subs = (meta.expenseCategories && meta.expenseCategories[el.value]) || [];
-            row.querySelector('select[data-field="subcategory"]').innerHTML = optionList(subs, "", true);
+            const type = row.querySelector('[data-field="transactionType"]')?.value || "Expense";
+            if (type === "Expense") {
+              const subs = (meta.expenseCategories && meta.expenseCategories[el.value]) || [];
+              row.querySelector('select[data-field="subcategory"]').innerHTML = optionList(subs, "", true);
+            }
           }
           if (el.dataset.field === "reviewStatus") {
             row.dataset.status = el.value;
@@ -566,21 +623,32 @@
     const original = items.find((tx) => String(tx.id) === String(row.dataset.id));
     const detail = detailRow(row.dataset.id);
     const d = get("timestamp").value ? new Date(get("timestamp").value) : new Date();
-    const people = detail ? selectedParticipants(detail) : (original?.participants || []);
+    const transactionType = get("transactionType")?.value || original?.transactionType || "Expense";
+    const transfer = isTransferType(transactionType);
+    const people = transfer
+      ? []
+      : (detail ? selectedParticipants(detail) : (original?.participants || []));
     const mode = people.length ? (get("splitMode")?.value || "equal") : "equal";
-    const alloc = detail && mode !== "equal"
-      ? collectAllocations(detail)
-      : (original?.splitAllocations ? parseAllocations(original.splitAllocations) : {});
+    const alloc = transfer
+      ? {}
+      : (detail && mode !== "equal"
+        ? collectAllocations(detail)
+        : (original?.splitAllocations ? parseAllocations(original.splitAllocations) : {}));
+    let merchantName = get("merchantName").value.trim();
+    const toAccount = get("category").value;
+    if (transfer && !merchantName && toAccount) {
+      merchantName = `Transfer to ${toAccount}`;
+    }
     return {
       amount: Number(get("amount").value),
-      merchantName: get("merchantName").value.trim(),
+      merchantName,
       account: get("account").value,
       category: get("category").value,
-      subcategory: get("subcategory").value,
+      subcategory: transfer ? "" : get("subcategory").value,
       notes: get("notes").value.trim(),
       reviewStatus: get("reviewStatus").value,
       timestamp: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
-      transactionType: original?.transactionType || "Expense",
+      transactionType,
       participants: people,
       splitMode: mode,
       splitAllocations: alloc
@@ -598,7 +666,17 @@
     }
     try {
       const body = collectRow(row);
-      if (!body.merchantName || !(body.amount > 0)) {
+      if (!(body.amount > 0)) {
+        throw new Error("Amount must be greater than 0");
+      }
+      if (body.transactionType === "Transfer-Out") {
+        if (!body.account || !body.category) {
+          throw new Error("Choose From and To accounts");
+        }
+        if (body.account.toLowerCase() === body.category.toLowerCase()) {
+          throw new Error("From and To must be different");
+        }
+      } else if (!body.merchantName) {
         throw new Error("Amount and merchant are required");
       }
       const preview = resolveSplitPreview(
@@ -779,10 +857,12 @@
       renderSheet();
     });
     document.getElementById("filterSubcategory").addEventListener("change", () => renderSheet());
+    document.getElementById("filterType").addEventListener("change", () => renderSheet());
     document.getElementById("clearFiltersBtn").onclick = () => {
       document.getElementById("searchInput").value = "";
       document.getElementById("filterAccount").value = "";
       document.getElementById("filterCategory").value = "";
+      document.getElementById("filterType").value = "";
       fillFilterSubcategories("");
       renderSheet();
     };
