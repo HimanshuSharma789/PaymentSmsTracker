@@ -43,15 +43,17 @@ object MoneyManagerExporter {
         val amount = BigDecimal.valueOf(transaction.amount).setScale(2, RoundingMode.HALF_UP)
 
         if (type != "Expense") {
+            // Transfer-Out: Account=From, Category=To (MM account name), Subcategory empty.
+            val transferTo = if (type == "Transfer-Out") {
+                transaction.category.ifBlank { description }
+            } else {
+                transaction.category
+            }
             return listOf(
                 MoneyManagerRow(
                     date = date,
                     account = account,
-                    category = if (type == "Transfer-Out") {
-                        transaction.category.ifBlank { description }
-                    } else {
-                        transaction.category
-                    },
+                    category = transferTo,
                     subcategory = if (type == "Transfer-Out") "" else transaction.subcategory,
                     note = note,
                     amount = amount.toPlainString(),

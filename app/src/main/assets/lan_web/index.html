@@ -48,6 +48,12 @@
         <select id="filterSubcategory" aria-label="Subcategory">
           <option value="">All subcategories</option>
         </select>
+        <select id="filterType" aria-label="Type">
+          <option value="">All types</option>
+          <option value="Expense">Expense</option>
+          <option value="Income">Income</option>
+          <option value="Transfer-Out">Transfer-Out</option>
+        </select>
         <button type="button" id="clearFiltersBtn" class="ghost">Clear</button>
         <span id="filterCount" class="filterCount muted"></span>
       </div>
@@ -75,23 +81,23 @@
         <label>Amount
           <input name="amount" type="number" step="0.01" min="0" required />
         </label>
-        <label>Merchant
-          <input name="merchantName" required />
-        </label>
-        <label>Account
-          <select name="account" id="accountSelect"></select>
+        <label id="merchantLabel">Merchant
+          <input name="merchantName" />
         </label>
         <label>Type
-          <select name="transactionType">
-            <option>Expense</option>
-            <option>Income</option>
-            <option>Transfer-Out</option>
+          <select name="transactionType" id="transactionTypeSelect">
+            <option value="Expense">Expense</option>
+            <option value="Income">Income</option>
+            <option value="Transfer-Out">Transfer-Out</option>
           </select>
         </label>
-        <label>Category
+        <label id="accountLabel">Account
+          <select name="account" id="accountSelect"></select>
+        </label>
+        <label id="categoryLabel">Category
           <select name="category" id="categorySelect"></select>
         </label>
-        <label>Subcategory
+        <label id="subcategoryLabel">Subcategory
           <select name="subcategory" id="subcategorySelect"></select>
         </label>
         <label>Date & time
@@ -100,11 +106,11 @@
         <label>Notes
           <input name="notes" />
         </label>
-        <fieldset>
+        <fieldset id="participantsFieldset">
           <legend>Participants</legend>
           <div id="participantChips" class="chips"></div>
         </fieldset>
-        <label>Split mode
+        <label id="splitModeLabel">Split mode
           <select name="splitMode" id="splitModeSelect">
             <option value="equal">equal</option>
             <option value="exact">exact</option>

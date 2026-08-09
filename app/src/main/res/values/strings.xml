@@ -14,6 +14,9 @@
     <string name="category">Category</string>
     <string name="subcategory">Subcategory</string>
     <string name="account">Account</string>
+    <string name="transfer_from">From</string>
+    <string name="transfer_to">To</string>
+    <string name="transfer_description_optional">Description (optional)</string>
     <string name="transaction_type">Type</string>
     <string name="notes">Notes</string>
     <string name="save_transaction">Save Transaction</string>

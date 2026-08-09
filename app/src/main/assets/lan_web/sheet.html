@@ -47,6 +47,12 @@
         <select id="filterSubcategory" aria-label="Subcategory">
           <option value="">All subcategories</option>
         </select>
+        <select id="filterType" aria-label="Type">
+          <option value="">All types</option>
+          <option value="Expense">Expense</option>
+          <option value="Income">Income</option>
+          <option value="Transfer-Out">Transfer-Out</option>
+        </select>
         <button type="button" id="clearFiltersBtn" class="ghost">Clear</button>
         <span id="filterCount" class="filterCount muted"></span>
       </div>
@@ -71,8 +77,9 @@
               <th>Date</th>
               <th>Merchant</th>
               <th>Amount</th>
-              <th>Account</th>
-              <th>Category</th>
+              <th>Type</th>
+              <th title="For Transfer-Out this is the From account">Account / From</th>
+              <th title="For Transfer-Out this is the To account">Category / To</th>
               <th>Subcategory</th>
               <th>Status</th>
               <th>Notes</th>
