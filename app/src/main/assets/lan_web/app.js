@@ -126,8 +126,102 @@
     return map;
   }
 
+  function splitwiseMeta() {
+    return meta.splitwise || { signedIn: false, groups: [], defaultGroupId: 0 };
+  }
+
+  function splitwiseGroupById(id) {
+    return (splitwiseMeta().groups || []).find((g) => String(g.id) === String(id));
+  }
+
+  function parseParticipantIdMap(raw) {
+    const map = {};
+    if (!raw) return map;
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      Object.entries(raw).forEach(([k, v]) => {
+        const id = Number(v);
+        if (k && id > 0) map[k] = id;
+      });
+      return map;
+    }
+    String(raw).split(/[,|]/).forEach((part) => {
+      const p = part.trim();
+      if (!p) return;
+      const sep = p.includes("=") ? "=" : ":";
+      const i = p.indexOf(sep);
+      if (i <= 0) return;
+      const name = p.slice(0, i).trim();
+      const id = Number(p.slice(i + 1).trim());
+      if (name && id > 0) map[name] = id;
+    });
+    return map;
+  }
+
   function selectedParticipants() {
     return Array.from(document.querySelectorAll("#participantChips input:checked")).map((el) => el.value);
+  }
+
+  function selectedParticipantIdMap() {
+    const map = {};
+    document.querySelectorAll("#participantChips input:checked").forEach((input) => {
+      const id = Number(input.dataset.userId);
+      if (input.value && id > 0) map[input.value] = id;
+    });
+    return map;
+  }
+
+  function fillSplitwiseGroupOptions(preferredId) {
+    const sel = document.getElementById("splitwiseGroupSelect");
+    const sw = splitwiseMeta();
+    const preferred = preferredId != null ? preferredId : (sw.defaultGroupId || 0);
+    sel.innerHTML = `<option value="0">No Splitwise group</option>` +
+      (sw.groups || []).map((g) =>
+        `<option value="${g.id}">${escapeHtml(g.name)}</option>`
+      ).join("");
+    if ((sw.groups || []).some((g) => String(g.id) === String(preferred))) {
+      sel.value = String(preferred);
+    } else {
+      sel.value = "0";
+    }
+  }
+
+  function fillMemberChips(selectedNames, selectedIdMap) {
+    const parts = document.getElementById("participantChips");
+    const hint = document.getElementById("splitwiseHint");
+    const groupId = Number(document.getElementById("splitwiseGroupSelect").value || 0);
+    const sw = splitwiseMeta();
+    const group = splitwiseGroupById(groupId);
+    if (!(sw.groups || []).length) {
+      parts.innerHTML = "";
+      hint.hidden = false;
+      hint.textContent = "Sync Splitwise groups in the app Admin first.";
+      return;
+    }
+    if (!groupId || !group) {
+      parts.innerHTML = "";
+      hint.hidden = false;
+      hint.textContent = "Choose a Splitwise group, then pick members.";
+      return;
+    }
+    hint.hidden = true;
+    const byName = new Set((selectedNames || []).map((n) => String(n).toLowerCase()));
+    const byId = selectedIdMap || {};
+    const hasSelection = byName.size > 0 || Object.keys(byId).length > 0;
+    parts.innerHTML = (group.members || []).map((m) => {
+      const label = m.label || `User ${m.id}`;
+      const id = Number(m.id) || 0;
+      let checked = false;
+      if (hasSelection) {
+        checked = byName.has(String(label).toLowerCase()) ||
+          Object.entries(byId).some(([k, v]) => Number(v) === id);
+      } else {
+        checked = String(label).toUpperCase() === "ME";
+      }
+      return `<label><input type="checkbox" value="${escapeHtml(label)}" data-user-id="${id}" ${checked ? "checked" : ""} /> ${escapeHtml(label)}</label>`;
+    }).join("");
+    parts.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("change", rebuildAllocations);
+    });
   }
 
   function rebuildAllocations() {
@@ -151,21 +245,16 @@
     }).join("");
   }
 
-  function isTransferType(type) {
-    return (type || form.transactionType.value) === "Transfer-Out";
-  }
-
   function fillMetaControls() {
     const accountSelect = document.getElementById("accountSelect");
     accountSelect.innerHTML = (meta.accounts || []).map((a) => `<option value="${a}">${a}</option>`).join("");
     fillCategoryOptionsForType();
-    const parts = document.getElementById("participantChips");
-    parts.innerHTML = (meta.participants || []).map((p) =>
-      `<label><input type="checkbox" value="${p}" /> ${p}</label>`
-    ).join("");
-    parts.querySelectorAll("input").forEach((input) => {
-      input.addEventListener("change", rebuildAllocations);
-    });
+    fillSplitwiseGroupOptions(splitwiseMeta().defaultGroupId || 0);
+    fillMemberChips([], {});
+  }
+
+  function isTransferType(type) {
+    return (type || form.transactionType.value) === "Transfer-Out";
   }
 
   function fillCategoryOptionsForType() {
@@ -194,11 +283,12 @@
     document.getElementById("merchantLabel").childNodes[0].textContent =
       transfer ? "Description (optional)" : "Merchant";
     document.getElementById("subcategoryLabel").hidden = transfer;
-    document.getElementById("participantsFieldset").hidden = transfer;
+    document.getElementById("splitFieldset").hidden = transfer;
     document.getElementById("splitModeLabel").hidden = transfer;
     if (transfer) {
       allocationBox.hidden = true;
       allocationBox.innerHTML = "";
+      document.getElementById("splitwiseGroupSelect").value = "0";
       document.querySelectorAll("#participantChips input").forEach((input) => {
         input.checked = false;
       });
@@ -403,14 +493,12 @@
       form.notes.value = tx.notes || "";
       form.splitMode.value = tx.splitMode || "equal";
       form.dataset.alloc = tx.splitAllocations || "";
-      const set = new Set(tx.participants || []);
-      document.querySelectorAll("#participantChips input").forEach((input) => {
-        input.checked = set.has(input.value);
-      });
+      fillSplitwiseGroupOptions(tx.splitwiseGroupId || splitwiseMeta().defaultGroupId || 0);
+      fillMemberChips(tx.participants || [], parseParticipantIdMap(tx.splitwiseParticipantIds));
     } else {
       form.date.value = ymdHm(Date.now());
-      const me = document.querySelector('#participantChips input[value="ME"]');
-      if (me) me.checked = true;
+      fillSplitwiseGroupOptions(splitwiseMeta().defaultGroupId || 0);
+      fillMemberChips([], {});
     }
     applyTypeFormUi();
     if (restoreCategory) form.category.value = restoreCategory;
@@ -449,7 +537,9 @@
       timestamp: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
       participants: people,
       splitMode: people.length ? mode : "equal",
-      splitAllocations: alloc
+      splitAllocations: alloc,
+      splitwiseGroupId: people.length ? Number(document.getElementById("splitwiseGroupSelect").value || 0) : 0,
+      splitwiseParticipantIds: people.length ? selectedParticipantIdMap() : {}
     };
   }
 
@@ -548,6 +638,10 @@
     };
     form.category.addEventListener("change", fillSubcategories);
     form.splitMode.addEventListener("change", rebuildAllocations);
+    document.getElementById("splitwiseGroupSelect").addEventListener("change", () => {
+      fillMemberChips([], {});
+      rebuildAllocations();
+    });
     form.transactionType.addEventListener("change", () => {
       applyTypeFormUi();
       rebuildAllocations();

@@ -27,6 +27,11 @@ import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
+import com.example.paymentsmstracker.splitwise.SplitwiseApi
+import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
+import com.example.paymentsmstracker.splitwise.SplitwiseMemberLabels
+import com.example.paymentsmstracker.splitwise.SplitwisePusher
+import com.example.paymentsmstracker.splitwise.SplitwiseSessionEvents
 import com.example.paymentsmstracker.ui.OptionPickerBottomSheet
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
@@ -78,6 +83,13 @@ class TransactionEntryActivity : AppCompatActivity() {
     private lateinit var buttonToggleMore: MaterialButton
     private lateinit var containerMoreDetails: View
     private lateinit var originalSmsCard: View
+    private lateinit var buttonPickSplitwiseGroup: MaterialButton
+    private lateinit var buttonPushSplitwise: MaterialButton
+    private lateinit var textSplitwisePushStatus: TextView
+    private lateinit var textSplitMembersHint: TextView
+    private lateinit var textSplitWithLabel: TextView
+    private lateinit var textSplitTypeLabel: TextView
+    private lateinit var splitwiseStore: SplitwiseAuthStore
 
     private lateinit var db: AppDatabase
     private lateinit var config: AppConfig
@@ -92,8 +104,15 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var selectedCategory: String = ""
     private var selectedSubcategory: String = ""
     private var selectedSplitMode: String = SplitMode.EQUAL
+    private var selectedSplitwiseGroupId: Long = 0L
+    private var selectedSplitwiseExpenseId: Long = 0L
+    private var currentReviewStatus: String = ReviewStatus.NEEDS_REVIEW
     private val allocationInputs = linkedMapOf<String, BigDecimal>()
+    private var loadedAllocations = emptyMap<String, BigDecimal>()
+    private var loadedParticipantIds = emptyMap<String, Long>()
+    private var loadedParticipantOrder = emptyList<String>()
     private var rebuildingAllocations = false
+    private var suppressingParticipantCallback = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +120,8 @@ class TransactionEntryActivity : AppCompatActivity() {
 
         db = AppDatabase.getDatabase(applicationContext)
         config = ConfigStore(this).load()
+        splitwiseStore = SplitwiseAuthStore(this)
+        SplitwiseSessionEvents.observe(this, this)
 
         val toolbar: androidx.appcompat.widget.Toolbar = findViewById(R.id.toolbar_transaction_entry)
         amountEditText = findViewById(R.id.editTextAmount)
@@ -125,17 +146,26 @@ class TransactionEntryActivity : AppCompatActivity() {
         buttonToggleMore = findViewById(R.id.buttonToggleMore)
         containerMoreDetails = findViewById(R.id.containerMoreDetails)
         originalSmsCard = findViewById(R.id.card_original_sms)
+        buttonPickSplitwiseGroup = findViewById(R.id.buttonPickSplitwiseGroup)
+        buttonPushSplitwise = findViewById(R.id.buttonPushSplitwise)
+        textSplitwisePushStatus = findViewById(R.id.textSplitwisePushStatus)
+        textSplitMembersHint = findViewById(R.id.textSplitMembersHint)
+        textSplitWithLabel = findViewById(R.id.textSplitWithLabel)
+        textSplitTypeLabel = findViewById(R.id.textSplitTypeLabel)
 
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        selectedSplitwiseGroupId = splitwiseStore.load().defaultGroupId
         setupPickers()
         setupFieldNavigation()
-        setupParticipantChips(emptySet())
         setupSplitModeChips()
         updateDateButtonText()
         updatePickerLabels()
+        bindSplitwiseGroupMembers(preferSelectedIds = emptySet(), selectAllIfEmpty = true)
+        updateSplitwiseGroupLabel()
         refreshSplitUi()
+        updatePushVisibility()
 
         currentTransactionId = intent.getLongExtra(EXTRA_TRANSACTION_ID, INVALID_TRANSACTION_ID)
         if (currentTransactionId != INVALID_TRANSACTION_ID) {
@@ -158,9 +188,13 @@ class TransactionEntryActivity : AppCompatActivity() {
         buttonToggleMore.setOnClickListener {
             toggleSection(containerMoreDetails, buttonToggleMore, R.string.add_split, R.string.hide_split)
         }
+        buttonPickSplitwiseGroup.setOnClickListener { openSplitwiseGroupPicker() }
+        buttonPushSplitwise.setOnClickListener { pushCurrentToSplitwise() }
         chipGroupParticipants.setOnCheckedStateChangeListener { _, _ ->
+            if (suppressingParticipantCallback) return@setOnCheckedStateChangeListener
             rebuildAllocationRows()
             refreshSplitUi()
+            updatePushVisibility()
         }
         amountEditText.addTextChangedListener(SimpleWatcher { refreshSplitUi() })
     }
@@ -278,13 +312,14 @@ class TransactionEntryActivity : AppCompatActivity() {
     }
 
     private fun clearSplitSelection() {
-        for (i in 0 until chipGroupParticipants.childCount) {
-            (chipGroupParticipants.getChildAt(i) as? Chip)?.isChecked = false
-        }
+        selectedSplitwiseGroupId = 0L
+        selectedSplitwiseExpenseId = 0L
         selectSplitModeChip(SplitMode.EQUAL)
         allocationInputs.clear()
+        bindSplitwiseGroupMembers(preferSelectedIds = emptySet(), selectAllIfEmpty = false)
         containerMoreDetails.visibility = View.GONE
         buttonToggleMore.setText(R.string.add_split)
+        updatePushVisibility()
     }
 
     private fun openSubcategoryPicker(advanceAfterSelect: Boolean) {
@@ -359,16 +394,127 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupParticipantChips(selected: Set<String>) {
-        chipGroupParticipants.removeAllViews()
-        config.participants.forEach { name ->
-            val chip = Chip(this).apply {
-                text = name
-                isCheckable = true
-                isChecked = selected.any { it.equals(name, ignoreCase = true) }
+    private fun bindSplitwiseGroupMembers(
+        preferSelectedIds: Set<Long>,
+        selectAllIfEmpty: Boolean
+    ) {
+        val auth = splitwiseStore.load()
+        val group = auth.groupById(selectedSplitwiseGroupId)
+        suppressingParticipantCallback = true
+        try {
+            chipGroupParticipants.removeAllViews()
+            if (group == null || group.members.isEmpty()) {
+                textSplitMembersHint.visibility = View.VISIBLE
+                textSplitMembersHint.setText(
+                    if (!auth.isSignedIn || auth.groups.isEmpty()) {
+                        R.string.split_sync_groups_hint
+                    } else {
+                        R.string.split_pick_group_first
+                    }
+                )
+                textSplitWithLabel.visibility = View.GONE
+                chipGroupParticipants.visibility = View.GONE
+                textSplitTypeLabel.visibility = View.GONE
+                chipGroupSplitMode.visibility = View.GONE
+                splitModeHintText.visibility = View.GONE
+                splitPreviewText.visibility = View.GONE
+                containerSplitAllocations.visibility = View.GONE
+                return
             }
-            chipGroupParticipants.addView(chip)
+
+            textSplitMembersHint.visibility = View.GONE
+            textSplitWithLabel.visibility = View.VISIBLE
+            chipGroupParticipants.visibility = View.VISIBLE
+            textSplitTypeLabel.visibility = View.VISIBLE
+            chipGroupSplitMode.visibility = View.VISIBLE
+            splitModeHintText.visibility = View.VISIBLE
+            splitPreviewText.visibility = View.VISIBLE
+
+            val labels = SplitwiseMemberLabels.labelsFor(group.members, auth.currentUserId)
+            val selectAll = selectAllIfEmpty && preferSelectedIds.isEmpty()
+            labels.forEach { (label, userId) ->
+                val chip = Chip(this).apply {
+                    text = label
+                    tag = userId
+                    isCheckable = true
+                    isChecked = selectAll || preferSelectedIds.contains(userId)
+                }
+                chipGroupParticipants.addView(chip)
+            }
+            restoreAllocationsForLabels(labels)
+        } finally {
+            suppressingParticipantCallback = false
         }
+        rebuildAllocationRows()
+        refreshSplitUi()
+    }
+
+    private fun restoreAllocationsForLabels(labels: List<Pair<String, Long>>) {
+        val source = if (loadedAllocations.isNotEmpty()) {
+            loadedAllocations
+        } else {
+            allocationInputs.toMap()
+        }
+        if (source.isEmpty()) return
+        val remapped = SplitCalculator.remapAllocationsToLabels(
+            allocations = source,
+            savedNameToId = loadedParticipantIds,
+            savedParticipantOrder = loadedParticipantOrder,
+            currentLabels = labels
+        )
+        if (remapped.isEmpty()) return
+        allocationInputs.clear()
+        allocationInputs.putAll(remapped)
+    }
+
+    private fun participantUserId(name: String): Long? {
+        for (i in 0 until chipGroupParticipants.childCount) {
+            val chip = chipGroupParticipants.getChildAt(i) as? Chip ?: continue
+            if (chip.text?.toString().equals(name, ignoreCase = true) == true) {
+                return chip.tag as? Long
+            }
+        }
+        return loadedParticipantIds.entries
+            .firstOrNull { it.key.equals(name, ignoreCase = true) }
+            ?.value
+    }
+
+    private fun allocationValueFor(name: String, userId: Long?): BigDecimal? {
+        allocationInputs.entries
+            .firstOrNull { it.key.equals(name, ignoreCase = true) }
+            ?.value
+            ?.let { return it }
+
+        if (userId != null && userId > 0L) {
+            val savedName = loadedParticipantIds.entries
+                .firstOrNull { it.value == userId }
+                ?.key
+            if (savedName != null) {
+                loadedAllocations.entries
+                    .firstOrNull { it.key.equals(savedName, ignoreCase = true) }
+                    ?.value
+                    ?.let { return it }
+            }
+            // Direct id-keyed allocations if we ever persist them that way
+            loadedAllocations[userId.toString()]?.let { return it }
+        }
+
+        loadedAllocations.entries
+            .firstOrNull { it.key.equals(name, ignoreCase = true) }
+            ?.value
+            ?.let { return it }
+
+        if (loadedParticipantOrder.isNotEmpty()) {
+            val index = selectedParticipants().indexOfFirst { it.equals(name, ignoreCase = true) }
+            if (index in loadedParticipantOrder.indices) {
+                val savedName = loadedParticipantOrder[index]
+                loadedAllocations.entries
+                    .firstOrNull { it.key.equals(savedName, ignoreCase = true) }
+                    ?.value
+                    ?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun selectedParticipants(): List<String> {
@@ -378,6 +524,17 @@ class TransactionEntryActivity : AppCompatActivity() {
             if (chip.isChecked) selected.add(chip.text.toString())
         }
         return selected
+    }
+
+    private fun selectedParticipantIdMap(): Map<String, Long> {
+        val map = linkedMapOf<String, Long>()
+        for (i in 0 until chipGroupParticipants.childCount) {
+            val chip = chipGroupParticipants.getChildAt(i) as? Chip ?: continue
+            if (!chip.isChecked) continue
+            val userId = (chip.tag as? Long) ?: continue
+            if (userId > 0L) map[chip.text.toString()] = userId
+        }
+        return map
     }
 
     private fun selectSplitModeChip(mode: String) {
@@ -394,17 +551,26 @@ class TransactionEntryActivity : AppCompatActivity() {
         rebuildingAllocations = true
         try {
             val people = selectedParticipants()
-            val keep = linkedMapOf<String, BigDecimal>()
+            // When members are not bound yet (e.g. mode chip selected during load),
+            // keep parsed allocations so they can populate after chips appear.
+            if (people.isEmpty()) {
+                containerSplitAllocations.removeAllViews()
+                return
+            }
+
+            // Resolve each person from in-memory inputs, remapped labels, or loaded DB values
+            // before rebuilding rows. Do not name-filter first — that drops values when chip
+            // labels differ from the keys stored on the transaction.
+            val resolved = linkedMapOf<String, BigDecimal>()
             people.forEach { name ->
-                allocationInputs.entries
-                    .firstOrNull { it.key.equals(name, ignoreCase = true) }
-                    ?.let { keep[name] = it.value }
+                val value = allocationValueFor(name, participantUserId(name))
+                if (value != null) resolved[name] = value
             }
             allocationInputs.clear()
-            allocationInputs.putAll(keep)
+            allocationInputs.putAll(resolved)
 
             containerSplitAllocations.removeAllViews()
-            if (selectedSplitMode == SplitMode.EQUAL || people.isEmpty()) {
+            if (selectedSplitMode == SplitMode.EQUAL) {
                 return
             }
 
@@ -428,6 +594,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                     allocationInputs[name] = BigDecimal.ONE
                 }
                 edit.addTextChangedListener(SimpleWatcher {
+                    if (rebuildingAllocations) return@SimpleWatcher
                     val value = edit.text?.toString()?.toBigDecimalOrNull()
                     if (value != null) {
                         allocationInputs[name] = value
@@ -522,15 +689,30 @@ class TransactionEntryActivity : AppCompatActivity() {
                 notesEditText.setText(tx.notes.orEmpty())
                 selectedTimestamp = tx.timestamp
                 selectedSplitMode = SplitMode.normalize(tx.splitMode)
+                currentReviewStatus = tx.reviewStatus
+                selectedSplitwiseGroupId = tx.splitwiseGroupId.takeIf { it > 0L }
+                    ?: splitwiseStore.load().defaultGroupId
+                selectedSplitwiseExpenseId = tx.splitwiseExpenseId
+                loadedAllocations = SplitCalculator.parseAllocations(tx.splitAllocations)
+                loadedParticipantIds = tx.participantIdMap()
+                loadedParticipantOrder = tx.participantList()
                 allocationInputs.clear()
-                allocationInputs.putAll(SplitCalculator.parseAllocations(tx.splitAllocations))
+                allocationInputs.putAll(loadedAllocations)
                 updateDateButtonText()
                 updatePickerLabels()
-                setupParticipantChips(tx.participantList().toSet())
+                val preferredIds = resolvePreferredMemberIds(tx)
+                // Bind members before selecting mode so mode-chip rebuild cannot wipe
+                // parsed allocations while the participant chip group is still empty.
+                bindSplitwiseGroupMembers(
+                    preferSelectedIds = preferredIds,
+                    selectAllIfEmpty = preferredIds.isEmpty() && tx.participants.isBlank()
+                )
                 selectSplitModeChip(selectedSplitMode)
                 rebuildAllocationRows()
                 refreshSplitUi()
-                if (!isTransfer() && tx.participants.isNotBlank()) {
+                updateSplitwiseGroupLabel()
+                updatePushVisibility()
+                if (!isTransfer() && (tx.participants.isNotBlank() || tx.splitwiseGroupId > 0L)) {
                     containerMoreDetails.visibility = View.VISIBLE
                     buttonToggleMore.setText(R.string.hide_split)
                 }
@@ -545,6 +727,21 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun resolvePreferredMemberIds(tx: Transaction): Set<Long> {
+        val fromIds = tx.participantIdMap().values.filter { it > 0L }.toSet()
+        if (fromIds.isNotEmpty()) return fromIds
+        val auth = splitwiseStore.load()
+        val group = auth.groupById(tx.splitwiseGroupId.takeIf { it > 0L } ?: selectedSplitwiseGroupId)
+            ?: return emptySet()
+        val labels = SplitwiseMemberLabels.labelsFor(group.members, auth.currentUserId)
+        val names = tx.participantList()
+        if (names.isEmpty()) return emptySet()
+        return labels
+            .filter { (label, _) -> names.any { it.equals(label, ignoreCase = true) } }
+            .map { it.second }
+            .toSet()
     }
 
     private fun toggleSection(
@@ -637,6 +834,11 @@ class TransactionEntryActivity : AppCompatActivity() {
             return
         }
 
+        if (participants.isNotEmpty() && selectedSplitwiseGroupId <= 0L) {
+            Toast.makeText(this, R.string.split_pick_group_first, Toast.LENGTH_LONG).show()
+            return
+        }
+
         val mode = if (participants.isEmpty()) SplitMode.EQUAL else selectedSplitMode
         val allocations = if (mode == SplitMode.EQUAL || participants.isEmpty()) {
             emptyMap()
@@ -651,7 +853,17 @@ class TransactionEntryActivity : AppCompatActivity() {
             }
         }
 
-        val status = if (markReviewed) ReviewStatus.REVIEWED else ReviewStatus.NEEDS_REVIEW
+        val previous = transactionToEdit?.reviewStatus
+        val status = when {
+            markReviewed && previous == ReviewStatus.EXPORTED -> ReviewStatus.EXPORTED
+            markReviewed -> ReviewStatus.REVIEWED
+            else -> ReviewStatus.NEEDS_REVIEW
+        }
+        val idMap = if (transfer || participants.isEmpty()) {
+            emptyMap()
+        } else {
+            selectedParticipantIdMap()
+        }
         val transaction = Transaction(
             id = if (currentTransactionId == INVALID_TRANSACTION_ID) 0L else currentTransactionId,
             amount = amount,
@@ -666,9 +878,17 @@ class TransactionEntryActivity : AppCompatActivity() {
             referenceNumber = transactionToEdit?.referenceNumber ?: referenceFromIntent,
             participants = participants.joinToString(","),
             splitMode = if (transfer) SplitMode.EQUAL else mode,
-            splitAllocations = if (transfer) "" else SplitCalculator.encodeAllocations(allocations),
+            splitAllocations = if (transfer) {
+                ""
+            } else {
+                SplitCalculator.encodeAllocations(allocations, idMap)
+            },
             reviewStatus = status,
             transactionType = selectedType,
+            splitwiseGroupId = if (transfer || participants.isEmpty()) 0L else selectedSplitwiseGroupId,
+            splitwiseExpenseId = selectedSplitwiseExpenseId,
+            splitwiseParticipantIds = Transaction.encodeParticipantIds(idMap),
+            splitwisePushError = transactionToEdit?.splitwisePushError.orEmpty(),
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
 
@@ -683,13 +903,156 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
                 Toast.makeText(
                     this@TransactionEntryActivity,
-                    if (markReviewed) "Marked reviewed" else "Saved draft",
+                    if (markReviewed) {
+                        if (status == ReviewStatus.EXPORTED) "Saved (exported)" else "Marked reviewed"
+                    } else {
+                        "Saved draft"
+                    },
                     Toast.LENGTH_SHORT
                 ).show()
                 finish()
             } catch (e: Exception) {
                 Log.e("TransactionEntry", "Save failed", e)
                 Toast.makeText(this@TransactionEntryActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun updateSplitwiseGroupLabel() {
+        val auth = splitwiseStore.load()
+        val name = auth.groupById(selectedSplitwiseGroupId)?.name
+        buttonPickSplitwiseGroup.text = when {
+            name != null -> "${getString(R.string.splitwise_group_picker)}: $name"
+            else -> getString(R.string.splitwise_group_picker)
+        }
+        updatePushVisibility()
+    }
+
+    private fun updatePushVisibility() {
+        val isSplit = selectedParticipants().size >= 2 ||
+            selectedParticipants().any { !it.equals("ME", true) }
+        val canShow = currentTransactionId != INVALID_TRANSACTION_ID &&
+            ReviewStatus.canPushToSplitwise(currentReviewStatus) &&
+            isSplit &&
+            !isTransfer()
+        buttonPushSplitwise.visibility = if (canShow) View.VISIBLE else View.GONE
+        if (selectedSplitwiseExpenseId > 0L) {
+            textSplitwisePushStatus.visibility = View.VISIBLE
+            textSplitwisePushStatus.text =
+                getString(R.string.splitwise_already_pushed, selectedSplitwiseExpenseId)
+            buttonPushSplitwise.isEnabled = false
+        } else {
+            textSplitwisePushStatus.visibility = View.GONE
+            buttonPushSplitwise.isEnabled = canShow
+        }
+    }
+
+    private fun openSplitwiseGroupPicker() {
+        val auth = splitwiseStore.load()
+        if (!auth.isSignedIn || auth.groups.isEmpty()) {
+            Toast.makeText(
+                this,
+                R.string.split_sync_groups_hint,
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val labels = listOf(getString(R.string.splitwise_group_none)) +
+            auth.groups.map { "${it.name} (${it.members.size})" }
+        val ids = listOf(0L) + auth.groups.map { it.id }
+        val checked = ids.indexOf(selectedSplitwiseGroupId).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.splitwise_group_picker)
+            .setSingleChoiceItems(labels.toTypedArray(), checked) { dialog, which ->
+                selectedSplitwiseGroupId = ids[which]
+                bindSplitwiseGroupMembers(
+                    preferSelectedIds = emptySet(),
+                    selectAllIfEmpty = selectedSplitwiseGroupId > 0L
+                )
+                updateSplitwiseGroupLabel()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun pushCurrentToSplitwise() {
+        if (currentTransactionId == INVALID_TRANSACTION_ID) {
+            Toast.makeText(this, "Save the transaction first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!ReviewStatus.canPushToSplitwise(currentReviewStatus)) {
+            Toast.makeText(this, R.string.splitwise_push_needs_reviewed, Toast.LENGTH_LONG).show()
+            return
+        }
+        val auth = splitwiseStore.load()
+        if (!auth.isSignedIn) {
+            Toast.makeText(this, R.string.splitwise_not_connected, Toast.LENGTH_LONG).show()
+            return
+        }
+        buttonPushSplitwise.isEnabled = false
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val dao = db.transactionDao()
+                val latest = dao.getTransactionById(currentTransactionId)
+                    ?: return@withContext null to "Transaction missing"
+                if (!ReviewStatus.canPushToSplitwise(latest.reviewStatus)) {
+                    return@withContext null to getString(R.string.splitwise_push_needs_reviewed)
+                }
+                val withGroup = latest.copy(
+                    splitwiseGroupId = selectedSplitwiseGroupId,
+                    splitwiseParticipantIds = Transaction.encodeParticipantIds(selectedParticipantIdMap())
+                        .ifBlank { latest.splitwiseParticipantIds },
+                    participants = selectedParticipants().joinToString(",")
+                        .ifBlank { latest.participants }
+                )
+                if (withGroup != latest) {
+                    dao.updateTransaction(withGroup)
+                }
+                val push = SplitwisePusher.pushOne(SplitwiseApi.from(splitwiseStore), auth, withGroup)
+                if (push.isSuccess && push.expenseId != null) {
+                    dao.updateTransaction(
+                        withGroup.copy(
+                            splitwiseExpenseId = push.expenseId,
+                            splitwisePushError = "",
+                            lastUpdatedTimestamp = System.currentTimeMillis()
+                        )
+                    )
+                } else if (!push.isSuccess) {
+                    dao.updateTransaction(
+                        withGroup.copy(
+                            splitwisePushError = (push.error ?: "Push failed").take(240),
+                            lastUpdatedTimestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
+                push to null
+            }
+            val (push, missing) = result
+            if (missing != null || push == null) {
+                buttonPushSplitwise.isEnabled = true
+                Toast.makeText(this@TransactionEntryActivity, missing ?: "Push failed", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            if (push.isSuccess) {
+                selectedSplitwiseExpenseId = push.expenseId ?: 0L
+                updatePushVisibility()
+                Toast.makeText(
+                    this@TransactionEntryActivity,
+                    "Pushed to Splitwise (#${push.expenseId})",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                buttonPushSplitwise.isEnabled = true
+                if (push.unauthorized) {
+                    SplitwiseSessionEvents.promptReauth(this@TransactionEntryActivity)
+                } else {
+                    Toast.makeText(
+                        this@TransactionEntryActivity,
+                        push.error ?: "Push failed",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }

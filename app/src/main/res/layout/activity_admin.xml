@@ -68,20 +68,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:hint="@string/participants_csv">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/editParticipants"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textMultiLine"
-                        android:minLines="2" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:hint="@string/dedupe_minutes">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -684,6 +670,294 @@
                     android:text="@string/clear_all_transactions"
                     android:textColor="?attr/colorError"
                     app:strokeColor="?attr/colorError" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- Tab: Splitwise -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/panelSplitwise"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/admin_tab_splitwise_hint"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                <!-- Connection summary -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSplitwiseConnection"
+                    style="?attr/materialCardViewFilledStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splitwise_connection_section"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/textSplitwiseStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceBodyLarge"
+                            tools:text="Signed in as Himanshu" />
+
+                        <TextView
+                            android:id="@+id/textSplitwiseAuthMethod"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            tools:text="Via API token" />
+
+                        <TextView
+                            android:id="@+id/textSplitwiseGroups"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            tools:text="Groups synced: 3" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseSyncGroups"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/splitwise_sync_groups" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseDefaultGroup"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/splitwise_default_group"
+                            android:textAllCaps="false" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseSignOut"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/splitwise_sign_out"
+                            android:textColor="?attr/colorError" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/splitwise_auth_pick_one"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <!-- 1. Direct signup / web session -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSplitwiseDirectAuth"
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splitwise_auth_direct_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall"
+                            android:textColor="?attr/colorPrimary" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/splitwise_auth_direct_hint"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseDirectSignIn"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/splitwise_auth_direct_action" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 2. OAuth app -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSplitwiseOAuthAuth"
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:strokeColor="?attr/colorSecondary"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splitwise_auth_oauth_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall"
+                            android:textColor="?attr/colorSecondary" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/splitwise_auth_oauth_hint"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:hint="@string/splitwise_callback_label">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editSplitwiseCallback"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:focusable="false"
+                                android:inputType="textUri"
+                                android:textIsSelectable="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:hint="@string/splitwise_consumer_key">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editSplitwiseConsumerKey"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textVisiblePassword"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:hint="@string/splitwise_consumer_secret">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editSplitwiseConsumerSecret"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textPassword"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseSaveCredentials"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/splitwise_save_credentials" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseOAuthSignIn"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/splitwise_auth_oauth_action" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 3. API token -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSplitwiseTokenAuth"
+                    android:layout_marginBottom="24dp"
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:strokeColor="?attr/colorTertiary"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splitwise_auth_token_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall"
+                            android:textColor="?attr/colorTertiary" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/splitwise_auth_token_hint"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:hint="@string/splitwise_api_key"
+                            app:helperText="@string/splitwise_api_key_hint"
+                            app:helperTextEnabled="true">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editSplitwiseApiKey"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textPassword"
+                                android:maxLines="2" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseConnectApiKey"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/splitwise_connect_api_key" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </FrameLayout>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_select_pending_splits"
+        android:icon="@drawable/outline_checklist_24"
+        android:title="@string/select_to_delete"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_export_pending_csv"
+        android:title="@string/export_splitwise"
+        app:showAsAction="never" />
+</menu>

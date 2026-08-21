@@ -147,7 +147,7 @@ class TransactionAdapter(
             }
             categoryTextView.text = categoryLabel
 
-            val showStatus = listFilter == ListFilter.TODAY || listFilter == ListFilter.ALL
+            val showStatus = listFilter == ListFilter.ALL
             if (showStatus) {
                 statusTextView.visibility = View.VISIBLE
                 statusTextView.text = when (transaction.reviewStatus) {

@@ -379,21 +379,81 @@
     }
   }
 
-  function participantChipsHtml(selected) {
-    const set = new Set(selected || []);
-    const names = meta.participants || [];
-    if (!names.length) {
-      return `<p class="muted detailHint">No participants configured in Admin.</p>`;
+  function splitwiseMeta() {
+    return meta.splitwise || { signedIn: false, groups: [], defaultGroupId: 0 };
+  }
+
+  function splitwiseGroupById(id) {
+    return (splitwiseMeta().groups || []).find((g) => String(g.id) === String(id));
+  }
+
+  function memberChipsHtml(groupId, selectedNames, selectedIdMap) {
+    const group = splitwiseGroupById(groupId);
+    if (!groupId || Number(groupId) <= 0) {
+      return `<p class="muted detailHint">Choose a Splitwise group, then pick members.</p>`;
     }
-    return `<div class="chips participantChips">${names.map((p) => {
-      const on = set.has(p) ? " active" : "";
-      return `<button type="button" class="partChip${on}" data-participant="${escapeHtml(p)}">${escapeHtml(p)}</button>`;
+    if (!group || !(group.members || []).length) {
+      return `<p class="muted detailHint">No members in this group. Refresh groups in Admin.</p>`;
+    }
+    const byName = new Set((selectedNames || []).map((n) => String(n).toLowerCase()));
+    const byId = selectedIdMap || {};
+    const hasSelection = byName.size > 0 || Object.keys(byId).length > 0;
+    return `<div class="chips participantChips">${(group.members || []).map((m) => {
+      const label = m.label || m.displayName || `User ${m.id}`;
+      const id = Number(m.id) || 0;
+      let on = false;
+      if (hasSelection) {
+        on = byName.has(String(label).toLowerCase()) ||
+          Object.entries(byId).some(([k, v]) => Number(v) === id || String(k).toLowerCase() === String(label).toLowerCase());
+      } else {
+        on = String(label).toUpperCase() === "ME";
+      }
+      return `<button type="button" class="partChip${on ? " active" : ""}" data-participant="${escapeHtml(label)}" data-user-id="${id}">${escapeHtml(label)}</button>`;
     }).join("")}</div>`;
+  }
+
+  function parseParticipantIdMap(raw) {
+    const map = {};
+    if (!raw) return map;
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      Object.entries(raw).forEach(([k, v]) => {
+        const id = Number(v);
+        if (k && id > 0) map[k] = id;
+      });
+      return map;
+    }
+    String(raw).split(/[,|]/).forEach((part) => {
+      const p = part.trim();
+      if (!p) return;
+      const sep = p.includes("=") ? "=" : ":";
+      const i = p.indexOf(sep);
+      if (i <= 0) return;
+      const name = p.slice(0, i).trim();
+      const id = Number(p.slice(i + 1).trim());
+      if (name && id > 0) map[name] = id;
+    });
+    return map;
   }
 
   function selectedParticipants(detail) {
     return Array.from(detail.querySelectorAll(".partChip.active"))
-      .map((el) => el.dataset.participant);
+      .map((el) => el.dataset.participant)
+      .filter(Boolean);
+  }
+
+  function selectedParticipantIdMap(detail) {
+    const map = {};
+    detail.querySelectorAll(".partChip.active").forEach((el) => {
+      const name = el.dataset.participant;
+      const id = Number(el.dataset.userId);
+      if (name && id > 0) map[name] = id;
+    });
+    return map;
+  }
+
+  function participantChipsHtml(selected) {
+    // legacy no-op kept for safety; use memberChipsHtml
+    return memberChipsHtml(0, selected, {});
   }
 
   function allocationPlaceholder(mode) {
@@ -515,8 +575,25 @@
                 <h3>Split</h3>
                 <p class="splitMeta">${escapeHtml(splitLabel(tx))}</p>
                 <p class="splitLiveError error" hidden></p>
-                <p class="detailLabel">Participants</p>
-                ${participantChipsHtml(tx.participants || [])}
+                ${(() => {
+                  const sw = splitwiseMeta();
+                  if (!(sw.groups || []).length) {
+                    return `<p class="muted detailHint">Sync Splitwise groups in the app Admin first.</p>`;
+                  }
+                  const selectedGroup = Number(tx.splitwiseGroupId) > 0
+                    ? tx.splitwiseGroupId
+                    : (sw.defaultGroupId || 0);
+                  const options = [`<option value="0">No Splitwise group</option>`]
+                    .concat((sw.groups || []).map((g) =>
+                      `<option value="${g.id}" ${String(g.id) === String(selectedGroup) ? "selected" : ""}>${escapeHtml(g.name)}</option>`
+                    )).join("");
+                  return `
+                <label class="detailLabel tight">Splitwise group
+                  <select data-field="splitwiseGroupId" class="groupSelect">${options}</select>
+                </label>
+                <p class="detailLabel tight">Members</p>
+                <div class="memberChipsHost">${memberChipsHtml(selectedGroup, tx.participants || [], parseParticipantIdMap(tx.splitwiseParticipantIds))}</div>`;
+                })()}
                 <div class="modeRow">
                   <span class="detailLabel">Mode</span>
                   <select data-field="splitMode" class="modeSelectCompact">
@@ -570,13 +647,26 @@
           wireAllocInputs(detail, row, markDirty);
           refreshSplitMeta(row, detail);
         };
-        detail.querySelectorAll(".partChip").forEach((chip) => {
-          chip.addEventListener("click", () => {
-            chip.classList.toggle("active");
-            markDirty();
-            syncSplitUi();
+        const wireMemberChips = () => {
+          detail.querySelectorAll(".partChip").forEach((chip) => {
+            chip.addEventListener("click", () => {
+              chip.classList.toggle("active");
+              markDirty();
+              syncSplitUi();
+            });
           });
+        };
+        const groupSelect = detail.querySelector('[data-field="splitwiseGroupId"]');
+        groupSelect?.addEventListener("change", () => {
+          const host = detail.querySelector(".memberChipsHost");
+          if (host) {
+            host.innerHTML = memberChipsHtml(groupSelect.value, [], {});
+            wireMemberChips();
+          }
+          markDirty();
+          syncSplitUi();
         });
+        wireMemberChips();
         const modeSelect = detail.querySelector('[data-field="splitMode"]');
         modeSelect?.addEventListener("change", () => {
           markDirty();
@@ -634,6 +724,12 @@
       : (detail && mode !== "equal"
         ? collectAllocations(detail)
         : (original?.splitAllocations ? parseAllocations(original.splitAllocations) : {}));
+    const groupId = transfer
+      ? 0
+      : Number(get("splitwiseGroupId")?.value || original?.splitwiseGroupId || 0);
+    const idMap = transfer
+      ? {}
+      : (detail ? selectedParticipantIdMap(detail) : parseParticipantIdMap(original?.splitwiseParticipantIds));
     let merchantName = get("merchantName").value.trim();
     const toAccount = get("category").value;
     if (transfer && !merchantName && toAccount) {
@@ -651,7 +747,9 @@
       transactionType,
       participants: people,
       splitMode: mode,
-      splitAllocations: alloc
+      splitAllocations: alloc,
+      splitwiseGroupId: people.length ? groupId : 0,
+      splitwiseParticipantIds: idMap
     };
   }
 

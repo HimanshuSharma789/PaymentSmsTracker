@@ -69,10 +69,13 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.status.pages)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.security.crypto)
     // Optional - Test helpers
     testImplementation(libs.androidx.room.testing)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

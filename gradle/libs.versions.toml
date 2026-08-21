@@ -15,6 +15,8 @@ recyclerview = "1.4.0"
 material = "1.12.0"
 constraintlayout = "2.2.1"
 ktor = "3.0.3"
+okhttp = "4.12.0"
+securityCrypto = "1.1.0-alpha06"
 
 [libraries]
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activityCompose" }
@@ -45,6 +47,9 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio-jvm", version.ref = "ktor" }
 ktor-server-status-pages = { group = "io.ktor", name = "ktor-server-status-pages-jvm", version.ref = "ktor" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -38,6 +38,23 @@ class SmsParserAndExportTest {
     }
 
     @Test
+    fun parsesIciciCardSpend() {
+        val sms =
+            "INR 285.00 spent using ICICI Bank Card XX0004 on 19-Aug-26 on AMAZON PAY IN E. Avl Limit: INR 3,19,715.00. If not you, call 1800 2662/SMS BLOCK 0004 to 9215676766."
+        val parsed = parser.parse(sms)
+        assertNotNull(parsed)
+        assertEquals(285.0, parsed!!.amount, 0.001)
+        assertEquals("AMAZON PAY IN E", parsed.merchantName)
+        assertEquals("ICICI credit card", parsed.account)
+        assertEquals("icici_card_spend", parsed.matchedRuleId)
+        val cal = Calendar.getInstance().apply { timeInMillis = parsed.timestamp }
+        assertEquals(2026, cal.get(Calendar.YEAR))
+        assertEquals(Calendar.AUGUST, cal.get(Calendar.MONTH))
+        assertEquals(19, cal.get(Calendar.DAY_OF_MONTH))
+        assertTrue(parsed.timestampFromMessage)
+    }
+
+    @Test
     fun parseAirtelPaymentsBankDebit() {
         val body =
             "Rs. 2200.00 debited from Airtel Payments Bank a/c Txn ID 297805887122 Bal:6073.82 Call 180023400 for help"

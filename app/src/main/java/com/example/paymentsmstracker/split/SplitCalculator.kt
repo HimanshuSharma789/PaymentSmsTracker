@@ -55,7 +55,25 @@ object SplitCalculator {
     }
 
     fun encodeAllocations(values: Map<String, BigDecimal>): String =
-        values.entries.joinToString(",") { "${it.key}:${it.value.stripTrailingZeros().toPlainString()}" }
+        values.entries.joinToString(",") {
+            "${it.key}:${it.value.stripTrailingZeros().toPlainString()}"
+        }
+
+    /**
+     * Prefer Splitwise user ids as keys when available so reopen/restore does not
+     * depend on display-name stability. Falls back to participant labels.
+     */
+    fun encodeAllocations(
+        values: Map<String, BigDecimal>,
+        nameToId: Map<String, Long>
+    ): String =
+        values.entries.joinToString(",") { (name, amount) ->
+            val id = nameToId.entries
+                .firstOrNull { it.key.equals(name, ignoreCase = true) }
+                ?.value
+            val key = if (id != null && id > 0L) id.toString() else name
+            "$key:${amount.stripTrailingZeros().toPlainString()}"
+        }
 
     fun resolve(
         totalAmount: Double,
@@ -104,13 +122,26 @@ object SplitCalculator {
         )
     }
 
-    fun resolve(transaction: Transaction): SplitAllocationResult =
-        resolve(
-            totalAmount = transaction.amount,
-            participants = transaction.participantList(),
-            mode = transaction.splitMode,
-            allocationInputs = parseAllocations(transaction.splitAllocations)
+    fun resolve(transaction: Transaction): SplitAllocationResult {
+        val people = transaction.participantList()
+        val idMap = transaction.participantIdMap()
+        val parsed = parseAllocations(transaction.splitAllocations)
+        val labels = people.map { name ->
+            name to (idMap.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value ?: 0L)
+        }
+        val remapped = remapAllocationsToLabels(
+            allocations = parsed,
+            savedNameToId = idMap,
+            savedParticipantOrder = people,
+            currentLabels = labels
         )
+        return resolve(
+            totalAmount = transaction.amount,
+            participants = people,
+            mode = transaction.splitMode,
+            allocationInputs = remapped.ifEmpty { parsed }
+        )
+    }
 
     private data class Intermediate(
         val amounts: Map<String, BigDecimal> = emptyMap(),
@@ -218,4 +249,57 @@ object SplitCalculator {
 
     private fun lookup(inputs: Map<String, BigDecimal>, name: String): BigDecimal? =
         inputs.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+
+    /**
+     * Re-keys saved allocation inputs onto the current chip labels.
+     * Prefer Splitwise user ids when available so renamed display labels still restore.
+     * Falls back to case-insensitive name match, then saved participant order.
+     */
+    fun remapAllocationsToLabels(
+        allocations: Map<String, BigDecimal>,
+        savedNameToId: Map<String, Long>,
+        savedParticipantOrder: List<String>,
+        currentLabels: List<Pair<String, Long>>
+    ): Map<String, BigDecimal> {
+        if (allocations.isEmpty() || currentLabels.isEmpty()) return emptyMap()
+
+        val idToAmount = linkedMapOf<Long, BigDecimal>()
+        allocations.forEach { (name, amount) ->
+            val directId = name.toLongOrNull()
+            if (directId != null && directId > 0L) {
+                idToAmount[directId] = amount
+                return@forEach
+            }
+            val id = savedNameToId.entries
+                .firstOrNull { it.key.equals(name, ignoreCase = true) }
+                ?.value
+            if (id != null && id > 0L) {
+                idToAmount[id] = amount
+            }
+        }
+
+        val remapped = linkedMapOf<String, BigDecimal>()
+        currentLabels.forEach { (label, userId) ->
+            val byId = if (userId > 0L) idToAmount[userId] else null
+            val byName = allocations.entries
+                .firstOrNull { it.key.equals(label, ignoreCase = true) }
+                ?.value
+            when {
+                byId != null -> remapped[label] = byId
+                byName != null -> remapped[label] = byName
+            }
+        }
+
+        if (remapped.size < currentLabels.size && savedParticipantOrder.isNotEmpty()) {
+            savedParticipantOrder.forEachIndexed { index, savedName ->
+                if (index >= currentLabels.size) return@forEachIndexed
+                val (label, _) = currentLabels[index]
+                if (remapped.containsKey(label)) return@forEachIndexed
+                allocations.entries
+                    .firstOrNull { it.key.equals(savedName, ignoreCase = true) }
+                    ?.let { remapped[label] = it.value }
+            }
+        }
+        return remapped
+    }
 }

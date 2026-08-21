@@ -34,6 +34,16 @@ Equal split across checked participants. Your share goes to the chosen category;
 
 Example: ₹100 with `ME,PUNEET,KUSHAGRA,MUKUL` → ₹25 Movie + ₹75 Dues.
 
+## Splitwise API (optional)
+
+CSV export still works. To push splits:
+
+1. **Admin → Splitwise → Sign in with Splitwise** — in-app WebView (MFA and CAPTCHA stay on Splitwise’s site). Session cookies (`_splitwise_session`, `user_credentials`) and CSRF are stored in EncryptedSharedPreferences (Android Keystore).
+2. Or paste a **personal API key** / use OAuth consumer key+secret if you have a registered app.
+3. Refresh groups / map friends / push as before.
+
+On HTTP 401 the app clears cached tokens and prompts you to sign in again. Do not back up those prefs (they are excluded from Auto Backup).
+
 ## Build
 
 Open in Android Studio, sync Gradle, run on device. Grant SMS + notification permissions from the home screen.

@@ -254,38 +254,66 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="12dp">
+                        android:padding="8dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonPickSplitwiseGroup"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="40dp"
+                            android:text="@string/splitwise_group_picker"
+                            android:textAllCaps="false" />
 
                         <TextView
+                            android:id="@+id/textSplitMembersHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/split_pick_group_first"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <TextView
+                            android:id="@+id/textSplitWithLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
                             android:text="@string/split_with"
-                            android:textAppearance="?attr/textAppearanceLabelLarge" />
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
 
                         <com.google.android.material.chip.ChipGroup
                             android:id="@+id/chipGroupParticipants"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="2dp"
+                            android:visibility="gone"
                             app:chipSpacingHorizontal="4dp"
                             app:chipSpacingVertical="0dp"
-                            app:singleSelection="false" />
+                            app:singleSelection="false"
+                            tools:visibility="visible" />
 
                         <TextView
+                            android:id="@+id/textSplitTypeLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
+                            android:layout_marginTop="8dp"
                             android:text="@string/split_type"
-                            android:textAppearance="?attr/textAppearanceLabelLarge" />
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
 
                         <com.google.android.material.chip.ChipGroup
                             android:id="@+id/chipGroupSplitMode"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="2dp"
+                            android:visibility="gone"
                             app:chipSpacingHorizontal="4dp"
                             app:selectionRequired="true"
-                            app:singleSelection="true">
+                            app:singleSelection="true"
+                            tools:visibility="visible">
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/chipSplitEqual"
@@ -327,7 +355,9 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="@string/split_hint_equal"
-                            android:textAppearance="?attr/textAppearanceBodySmall" />
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
 
                         <LinearLayout
                             android:id="@+id/containerSplitAllocations"
@@ -345,7 +375,29 @@
                             android:layout_marginTop="8dp"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorPrimary"
-                            tools:text="You: ₹25 · Dues: ₹75" />
+                            android:visibility="gone"
+                            tools:text="You: ₹25 · Dues: ₹75"
+                            tools:visibility="visible" />
+
+                        <TextView
+                            android:id="@+id/textSplitwisePushStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:visibility="gone"
+                            tools:text="Pushed · expense #123"
+                            tools:visibility="visible" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonPushSplitwise"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/splitwise_push_one"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/buttonDeleteTransaction"

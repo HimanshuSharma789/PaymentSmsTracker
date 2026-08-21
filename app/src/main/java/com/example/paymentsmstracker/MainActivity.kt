@@ -75,6 +75,13 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         }
+        findViewById<Button>(R.id.button_view_exported)?.setOnClickListener {
+            startActivity(
+                Intent(this, TransactionListActivity::class.java).apply {
+                    putExtra(TransactionListActivity.EXTRA_FILTER, ListFilter.MM_EXPORTED.name)
+                }
+            )
+        }
         findViewById<Button>(R.id.button_open_splits)?.setOnClickListener {
             startActivity(Intent(this, SplitsActivity::class.java))
         }

@@ -4,20 +4,31 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="12dp"
-    android:paddingVertical="12dp">
+    android:paddingHorizontal="6dp"
+    android:paddingVertical="6dp">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkSplitSelect"
+        android:layout_width="40dp"
+        android:layout_height="wrap_content"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:padding="0dp"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
     <TextView
         android:id="@+id/textSplitDate"
-        android:layout_width="88dp"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:textSize="13sp"
         tools:text="26 Jul" />
 
     <TextView
         android:id="@+id/textSplitMerchant"
-        android:layout_width="140dp"
+        android:layout_width="120dp"
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="2"
@@ -27,7 +38,7 @@
 
     <TextView
         android:id="@+id/textSplitTotal"
-        android:layout_width="80dp"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:gravity="end"
         android:textSize="13sp"
@@ -35,7 +46,7 @@
 
     <TextView
         android:id="@+id/textSplitMyShare"
-        android:layout_width="72dp"
+        android:layout_width="64dp"
         android:layout_height="wrap_content"
         android:gravity="end"
         android:textSize="13sp"
@@ -43,7 +54,7 @@
 
     <TextView
         android:id="@+id/textSplitFriendsOwe"
-        android:layout_width="80dp"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:gravity="end"
         android:textColor="?attr/colorPrimary"
@@ -53,11 +64,21 @@
 
     <TextView
         android:id="@+id/textSplitPeople"
-        android:layout_width="160dp"
+        android:layout_width="140dp"
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="2"
-        android:paddingStart="12dp"
+        android:paddingStart="6dp"
         android:textSize="12sp"
-        tools:text="ME, PUNEET, KUSHAGRA" />
+        tools:text="ME, PUNEET" />
+
+    <TextView
+        android:id="@+id/textSplitStatus"
+        android:layout_width="140dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:paddingStart="6dp"
+        android:textSize="12sp"
+        tools:text="Push failed" />
 </LinearLayout>

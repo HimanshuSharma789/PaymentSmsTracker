@@ -32,7 +32,8 @@ class LocalHttpServer(private val appContext: Context) {
     private var engine: EmbeddedServer<*, *>? = null
     private val api = LanApi(
         db = AppDatabase.getDatabase(appContext),
-        configStore = ConfigStore(appContext)
+        configStore = ConfigStore(appContext),
+        splitwiseStore = com.example.paymentsmstracker.splitwise.SplitwiseAuthStore(appContext)
     )
 
     fun start(preferredPort: Int = 0): Int {

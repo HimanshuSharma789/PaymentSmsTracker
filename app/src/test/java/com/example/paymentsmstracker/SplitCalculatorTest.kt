@@ -2,11 +2,14 @@ package com.example.paymentsmstracker
 
 import com.example.paymentsmstracker.adapter.SplitTableAdapter
 import com.example.paymentsmstracker.config.AppConfig
+import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
+import com.example.paymentsmstracker.splitwise.SplitwiseMemberLabels
+import com.example.paymentsmstracker.splitwise.SplitwiseUser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -220,6 +223,8 @@ class SplitCalculatorTest {
         assertEquals("40.00", row.myShare)
         assertEquals("60.00", row.friendsOwe)
         assertTrue(row.people.contains("Percentage"))
+        assertEquals("Pending", row.status)
+        assertFalse(row.failed)
     }
 
     @Test
@@ -258,6 +263,139 @@ class SplitCalculatorTest {
         assertNull(result.error)
         assertEquals(bd("30.00"), result.myShare)
         assertEquals(bd("30.00"), result.friendsOwe)
+    }
+
+    @Test
+    fun participantIdEncodeParseRoundTrip() {
+        val encoded = Transaction.encodeParticipantIds(
+            mapOf("ME" to 10L, "Puneet S" to 22L)
+        )
+        val parsed = Transaction.parseParticipantIds(encoded)
+        assertEquals(10L, parsed["ME"])
+        assertEquals(22L, parsed["Puneet S"])
+        assertTrue(ReviewStatus.canPushToSplitwise(ReviewStatus.REVIEWED))
+        assertTrue(ReviewStatus.canPushToSplitwise(ReviewStatus.EXPORTED))
+        assertFalse(ReviewStatus.canPushToSplitwise(ReviewStatus.NEEDS_REVIEW))
+    }
+
+    @Test
+    fun memberLabelsMarkCurrentUserAsMeAndDedup() {
+        val labels = SplitwiseMemberLabels.labelsFor(
+            members = listOf(
+                SplitwiseUser(1, "Himanshu", "Sharma"),
+                SplitwiseUser(2, "Alex", ""),
+                SplitwiseUser(3, "Alex", "B")
+            ),
+            currentUserId = 1L
+        )
+        assertEquals("ME", labels[0].first)
+        assertEquals(1L, labels[0].second)
+        assertEquals("Alex", labels[1].first)
+        assertTrue(labels[2].first.contains("Alex"))
+        assertTrue(labels.map { it.first.lowercase() }.toSet().size == 3)
+    }
+
+    @Test
+    fun deselectedMemberNotInEqualSplit() {
+        val result = SplitCalculator.resolve(
+            90.0,
+            participants = listOf("ME", "PUNEET"),
+            mode = SplitMode.EQUAL,
+            allocationInputs = emptyMap()
+        )
+        assertTrue(result.isValid)
+        assertEquals(bd("45.00"), result.myShare)
+        assertEquals(bd("45.00"), result.amounts["PUNEET"])
+        assertTrue("KUSHAGRA" !in result.amounts)
+    }
+
+    @Test
+    fun remapAllocationsUsesSplitwiseIdsWhenLabelsChange() {
+        val remapped = SplitCalculator.remapAllocationsToLabels(
+            allocations = mapOf(
+                "PUNEET" to bd("5"),
+                "KUSHAGRA" to bd("2"),
+                "ME" to bd("3")
+            ),
+            savedNameToId = mapOf(
+                "PUNEET" to 101L,
+                "KUSHAGRA" to 102L,
+                "ME" to 10L
+            ),
+            savedParticipantOrder = listOf("PUNEET", "KUSHAGRA", "ME"),
+            currentLabels = listOf(
+                "Puneet Manghwani" to 101L,
+                "Kushagra Mehta" to 102L,
+                "ME" to 10L
+            )
+        )
+        assertEquals(bd("5"), remapped["Puneet Manghwani"])
+        assertEquals(bd("2"), remapped["Kushagra Mehta"])
+        assertEquals(bd("3"), remapped["ME"])
+    }
+
+    @Test
+    fun remapAllocationsFallsBackToSavedOrder() {
+        val remapped = SplitCalculator.remapAllocationsToLabels(
+            allocations = mapOf("A" to bd("5"), "B" to bd("2"), "C" to bd("3")),
+            savedNameToId = emptyMap(),
+            savedParticipantOrder = listOf("A", "B", "C"),
+            currentLabels = listOf(
+                "Puneet Manghwani" to 1L,
+                "Kushagra Mehta" to 2L,
+                "ME" to 3L
+            )
+        )
+        assertEquals(bd("5"), remapped["Puneet Manghwani"])
+        assertEquals(bd("2"), remapped["Kushagra Mehta"])
+        assertEquals(bd("3"), remapped["ME"])
+    }
+
+    @Test
+    fun remapAllocationsUsesNumericIdKeys() {
+        val remapped = SplitCalculator.remapAllocationsToLabels(
+            allocations = mapOf(
+                "101" to bd("5"),
+                "102" to bd("2"),
+                "10" to bd("3")
+            ),
+            savedNameToId = emptyMap(),
+            savedParticipantOrder = emptyList(),
+            currentLabels = listOf(
+                "Puneet Manghwani" to 101L,
+                "Kushagra Mehta" to 102L,
+                "ME" to 10L
+            )
+        )
+        assertEquals(bd("5"), remapped["Puneet Manghwani"])
+        assertEquals(bd("2"), remapped["Kushagra Mehta"])
+        assertEquals(bd("3"), remapped["ME"])
+    }
+
+    @Test
+    fun encodeAllocationsPrefersUserIds() {
+        val encoded = SplitCalculator.encodeAllocations(
+            values = mapOf("ME" to bd("3"), "Puneet" to bd("5")),
+            nameToId = mapOf("ME" to 10L, "Puneet" to 101L)
+        )
+        assertTrue(encoded.contains("10:3"))
+        assertTrue(encoded.contains("101:5"))
+        val resolved = SplitCalculator.resolve(
+            Transaction(
+                amount = 8.0,
+                merchantName = "Test",
+                timestamp = 1L,
+                participants = "ME,Puneet",
+                splitMode = SplitMode.EXACT,
+                splitAllocations = encoded,
+                splitwiseParticipantIds = Transaction.encodeParticipantIds(
+                    mapOf("ME" to 10L, "Puneet" to 101L)
+                )
+            )
+        )
+        assertTrue(resolved.isValid)
+        assertEquals(bd("3.00"), resolved.myShare)
+        assertEquals(bd("5.00"), resolved.amounts["Puneet"])
     }
 
     private fun bd(value: String): BigDecimal = BigDecimal(value).setScale(2)

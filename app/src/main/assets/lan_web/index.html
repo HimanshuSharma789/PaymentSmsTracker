@@ -106,9 +106,16 @@
         <label>Notes
           <input name="notes" />
         </label>
-        <fieldset id="participantsFieldset">
-          <legend>Participants</legend>
+        <fieldset id="splitFieldset">
+          <legend>Splitwise</legend>
+          <label class="tight">Group
+            <select name="splitwiseGroupId" id="splitwiseGroupSelect">
+              <option value="0">No Splitwise group</option>
+            </select>
+          </label>
+          <p class="detailLabel tight">Members</p>
           <div id="participantChips" class="chips"></div>
+          <p id="splitwiseHint" class="muted detailHint" hidden></p>
         </fieldset>
         <label id="splitModeLabel">Split mode
           <select name="splitMode" id="splitModeSelect">
