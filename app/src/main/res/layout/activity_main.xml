@@ -77,6 +77,15 @@
                 app:icon="@drawable/baseline_history_24" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_view_exported"
+                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/exported_transactions"
+                app:icon="@drawable/outline_task_alt_24" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_open_splits"
                 style="@style/Widget.Material3.Button.OutlinedButton.Icon"
                 android:layout_width="match_parent"

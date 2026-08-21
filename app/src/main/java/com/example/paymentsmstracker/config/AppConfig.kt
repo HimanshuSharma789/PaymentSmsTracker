@@ -20,7 +20,6 @@ data class SmsParseRule(
 
 data class AppConfig(
     val accounts: List<String> = DEFAULT_ACCOUNTS,
-    val participants: List<String> = DEFAULT_PARTICIPANTS,
     val expenseCategories: Map<String, List<String>> = DEFAULT_EXPENSE_CATEGORIES,
     val incomeCategories: List<String> = DEFAULT_INCOME_CATEGORIES,
     val debtCategory: String = "Social Life",
@@ -56,13 +55,10 @@ data class AppConfig(
             "Card",
             "SBI cashback credit card",
             "HDFC credit card",
+            "ICICI credit card",
             "HSBC debit card",
             "Mutual Funds",
             "Gold"
-        )
-
-        val DEFAULT_PARTICIPANTS = listOf(
-            "ME", "PUNEET", "KUSHAGRA", "MUKUL", "PIYUSH", "MEGHA"
         )
 
         val DEFAULT_INCOME_CATEGORIES = listOf(
@@ -98,6 +94,13 @@ data class AppConfig(
                 pattern = """(?i)Spent\s+Rs\.?\s*(?<amount>[\d,]+(?:\.\d{1,2})?)\s+On\s+HDFC.*?At\s+(?<merchant>.+?)\s+On\s+(?<date>\d{4}-\d{2}-\d{2}(?::\d{2}:\d{2}:\d{2})?)""",
                 dateFormat = "yyyy-MM-dd:HH:mm:ss",
                 defaultAccount = "HDFC credit card"
+            ),
+            SmsParseRule(
+                id = "icici_card_spend",
+                name = "ICICI Card Spend",
+                pattern = """(?i)INR\s+(?<amount>[\d,]+(?:\.\d{1,2})?)\s+spent\s+using\s+ICICI\s+Bank\s+Card\s+\S+\s+on\s+(?<date>\d{1,2}-\w{3}-\d{2,4})\s+on\s+(?<merchant>.+?)(?:\.\s*Avl|\.|$)""",
+                dateFormat = "dd-MMM-yy",
+                defaultAccount = "ICICI credit card"
             ),
             SmsParseRule(
                 id = "sbi_upi_debit",

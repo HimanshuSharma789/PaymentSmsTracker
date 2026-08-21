@@ -7,13 +7,16 @@ import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
+import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
+import com.example.paymentsmstracker.splitwise.SplitwiseMemberLabels
 import org.json.JSONArray
 import org.json.JSONObject
 import java.math.BigDecimal
 
 class LanApi(
     private val db: AppDatabase,
-    private val configStore: ConfigStore
+    private val configStore: ConfigStore,
+    private val splitwiseStore: SplitwiseAuthStore
 ) {
     private val dao get() = db.transactionDao()
 
@@ -37,10 +40,37 @@ class LanApi(
         }
         return JSONObject()
             .put("accounts", JSONArray(config.accounts))
-            .put("participants", JSONArray(config.participants))
             .put("expenseCategories", categories)
             .put("incomeCategories", JSONArray(config.incomeCategories))
             .put("splitModes", JSONArray(SplitMode.ALL))
+            .put("splitwise", splitwiseMetaJson())
+    }
+
+    private fun splitwiseMetaJson(): JSONObject {
+        val auth = splitwiseStore.load()
+        val groups = JSONArray()
+        auth.groups.forEach { group ->
+            val members = JSONArray()
+            SplitwiseMemberLabels.labelsFor(group.members, auth.currentUserId).forEach { (label, userId) ->
+                members.put(
+                    JSONObject()
+                        .put("id", userId)
+                        .put("label", label)
+                )
+            }
+            groups.put(
+                JSONObject()
+                    .put("id", group.id)
+                    .put("name", group.name)
+                    .put("members", members)
+            )
+        }
+        return JSONObject()
+            .put("signedIn", auth.isSignedIn)
+            .put("currentUserId", auth.currentUserId)
+            .put("currentUserName", auth.currentUserName)
+            .put("defaultGroupId", auth.defaultGroupId)
+            .put("groups", groups)
     }
 
     suspend fun listTransactions(status: String?): JSONArray {
@@ -254,9 +284,62 @@ class LanApi(
             },
             reviewStatus = reviewStatus,
             transactionType = transactionType,
+            splitwiseGroupId = body.optLong(
+                "splitwiseGroupId",
+                existing?.splitwiseGroupId ?: 0L
+            ).let { id -> if (participants.isEmpty()) 0L else id },
+            splitwiseExpenseId = existing?.splitwiseExpenseId ?: 0L,
+            splitwiseParticipantIds = resolveSplitwiseParticipantIds(
+                isTransfer = isTransfer,
+                participants = participants,
+                groupId = body.optLong(
+                    "splitwiseGroupId",
+                    existing?.splitwiseGroupId ?: 0L
+                ),
+                body = body,
+                existing = existing
+            ),
+            splitwisePushError = existing?.splitwisePushError.orEmpty(),
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
         return Parsed(transaction = tx)
+    }
+
+    private fun resolveSplitwiseParticipantIds(
+        isTransfer: Boolean,
+        participants: List<String>,
+        groupId: Long,
+        body: JSONObject,
+        existing: Transaction?
+    ): String {
+        if (isTransfer || participants.isEmpty()) return ""
+        if (body.has("splitwiseParticipantIds")) {
+            when (val raw = body.get("splitwiseParticipantIds")) {
+                is JSONObject -> {
+                    val map = buildMap {
+                        raw.keys().forEach { key ->
+                            val id = raw.optLong(key)
+                            if (id > 0L) put(key, id)
+                        }
+                    }
+                    if (map.isNotEmpty()) return Transaction.encodeParticipantIds(map)
+                }
+                is String -> if (raw.isNotBlank()) return raw
+            }
+        }
+        val auth = splitwiseStore.load()
+        val group = auth.groupById(groupId) ?: return existing?.splitwiseParticipantIds.orEmpty()
+        val labelToId = SplitwiseMemberLabels.labelsFor(group.members, auth.currentUserId)
+            .associate { it.first to it.second }
+        val mapped = linkedMapOf<String, Long>()
+        participants.forEach { name ->
+            val id = labelToId.entries
+                .firstOrNull { it.key.equals(name, ignoreCase = true) }
+                ?.value
+            if (id != null && id > 0L) mapped[name] = id
+        }
+        return Transaction.encodeParticipantIds(mapped)
+            .ifBlank { existing?.splitwiseParticipantIds.orEmpty() }
     }
 
     private fun parseAllocationMap(raw: Any): Map<String, BigDecimal> {
@@ -289,6 +372,10 @@ class LanApi(
             .put("splitAllocations", tx.splitAllocations)
             .put("reviewStatus", tx.reviewStatus)
             .put("transactionType", tx.transactionType)
+            .put("splitwiseGroupId", tx.splitwiseGroupId)
+            .put("splitwiseExpenseId", tx.splitwiseExpenseId)
+            .put("splitwiseParticipantIds", tx.splitwiseParticipantIds)
+            .put("splitwisePushError", tx.splitwisePushError)
             .put("referenceNumber", tx.referenceNumber ?: "")
             .put("originalSms", tx.originalSms ?: "")
             .put(

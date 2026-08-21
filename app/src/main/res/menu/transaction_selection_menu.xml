@@ -5,6 +5,13 @@
         android:id="@+id/action_mark_reviewed_selected"
         android:icon="@drawable/outline_task_alt_24"
         android:title="@string/mark_reviewed_selected"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_export_selected"
+        android:icon="@drawable/outline_task_alt_24"
+        android:title="@string/export_selected"
+        android:visible="false"
         app:showAsAction="always" />
     <item
         android:id="@+id/action_delete_selected"

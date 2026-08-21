@@ -27,6 +27,12 @@ import com.example.paymentsmstracker.server.LanServerState
 import com.example.paymentsmstracker.server.NetworkUtils
 import com.example.paymentsmstracker.sms.SmsDedupe
 import com.example.paymentsmstracker.sms.SmsParser
+import com.example.paymentsmstracker.splitwise.SplitwiseApi
+import com.example.paymentsmstracker.splitwise.SplitwiseAuthMethod
+import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
+import com.example.paymentsmstracker.splitwise.SplitwiseOAuthActivity
+import com.example.paymentsmstracker.splitwise.SplitwiseSessionEvents
+import com.example.paymentsmstracker.splitwise.SplitwiseWebAuthActivity
 import com.example.paymentsmstracker.theme.ThemeApplier
 import com.example.paymentsmstracker.theme.ThemeMode
 import com.example.paymentsmstracker.viewmodel.ListFilter
@@ -53,8 +59,8 @@ import kotlin.math.ceil
 class AdminActivity : AppCompatActivity() {
 
     private lateinit var configStore: ConfigStore
+    private lateinit var splitwiseStore: SplitwiseAuthStore
     private lateinit var editAccounts: TextInputEditText
-    private lateinit var editParticipants: TextInputEditText
     private lateinit var switchMmFullSplitAsOwn: MaterialSwitch
     private lateinit var layoutDebtCategory: TextInputLayout
     private lateinit var layoutDebtSubcategory: TextInputLayout
@@ -72,6 +78,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var textBackfillResult: android.widget.TextView
     private lateinit var textParseResult: android.widget.TextView
     private lateinit var panelBasics: View
+    private lateinit var panelSplitwise: View
     private lateinit var panelTheme: View
     private lateinit var panelLaptop: View
     private lateinit var panelRules: View
@@ -88,6 +95,15 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var textLanWarning: TextView
     private lateinit var buttonLanStart: MaterialButton
     private lateinit var buttonLanStop: MaterialButton
+    private lateinit var editSplitwiseCallback: TextInputEditText
+    private lateinit var editSplitwiseApiKey: TextInputEditText
+    private lateinit var editSplitwiseConsumerKey: TextInputEditText
+    private lateinit var editSplitwiseConsumerSecret: TextInputEditText
+    private lateinit var textSplitwiseStatus: TextView
+    private lateinit var textSplitwiseAuthMethod: TextView
+    private lateinit var textSplitwiseGroups: TextView
+    private lateinit var buttonSplitwiseDefaultGroup: MaterialButton
+    private lateinit var tabLayoutAdmin: TabLayout
 
     private var nightlyHour: Int = 21
     private var nightlyMinute: Int = 0
@@ -121,13 +137,14 @@ class AdminActivity : AppCompatActivity() {
         setContentView(R.layout.activity_admin)
 
         configStore = ConfigStore(this)
+        splitwiseStore = SplitwiseAuthStore(this)
+        SplitwiseSessionEvents.observe(this, this)
         val toolbar: MaterialToolbar = findViewById(R.id.toolbarAdmin)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener { finish() }
 
         editAccounts = findViewById(R.id.editAccounts)
-        editParticipants = findViewById(R.id.editParticipants)
         switchMmFullSplitAsOwn = findViewById(R.id.switchMmFullSplitAsOwn)
         layoutDebtCategory = findViewById(R.id.layoutDebtCategory)
         layoutDebtSubcategory = findViewById(R.id.layoutDebtSubcategory)
@@ -145,6 +162,7 @@ class AdminActivity : AppCompatActivity() {
         textBackfillResult = findViewById(R.id.textBackfillResult)
         textParseResult = findViewById(R.id.textParseResult)
         panelBasics = findViewById(R.id.panelBasics)
+        panelSplitwise = findViewById(R.id.panelSplitwise)
         panelTheme = findViewById(R.id.panelTheme)
         panelLaptop = findViewById(R.id.panelLaptop)
         panelRules = findViewById(R.id.panelRules)
@@ -161,10 +179,20 @@ class AdminActivity : AppCompatActivity() {
         textLanWarning = findViewById(R.id.textLanWarning)
         buttonLanStart = findViewById(R.id.buttonLanStart)
         buttonLanStop = findViewById(R.id.buttonLanStop)
+        editSplitwiseCallback = findViewById(R.id.editSplitwiseCallback)
+        editSplitwiseApiKey = findViewById(R.id.editSplitwiseApiKey)
+        editSplitwiseConsumerKey = findViewById(R.id.editSplitwiseConsumerKey)
+        editSplitwiseConsumerSecret = findViewById(R.id.editSplitwiseConsumerSecret)
+        textSplitwiseStatus = findViewById(R.id.textSplitwiseStatus)
+        textSplitwiseAuthMethod = findViewById(R.id.textSplitwiseAuthMethod)
+        textSplitwiseGroups = findViewById(R.id.textSplitwiseGroups)
+        buttonSplitwiseDefaultGroup = findViewById(R.id.buttonSplitwiseDefaultGroup)
+        tabLayoutAdmin = findViewById(R.id.tabLayoutAdmin)
 
         setupTabs()
         initializeBackfillDates()
         bindFromStore()
+        bindSplitwiseUi()
         refreshLanStatusUi()
 
         switchMmFullSplitAsOwn.setOnCheckedChangeListener { _, _ ->
@@ -192,7 +220,7 @@ class AdminActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.buttonResetConfig).setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Reset config?")
-                .setMessage("Restore default accounts, participants, and SMS regex rules.")
+                .setMessage("Restore default accounts and SMS regex rules.")
                 .setPositiveButton("Reset") { _, _ ->
                     configStore.resetToDefaults()
                     bindFromStore()
@@ -233,11 +261,55 @@ class AdminActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.buttonClearAll).setOnClickListener {
             confirmClearAll()
         }
+
+        findViewById<MaterialButton>(R.id.buttonSplitwiseSaveCredentials).setOnClickListener {
+            saveSplitwiseCredentials()
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseConnectApiKey).setOnClickListener {
+            connectSplitwiseWithApiKey()
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseDirectSignIn).setOnClickListener {
+            SplitwiseWebAuthActivity.start(this, oauthMode = false)
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseOAuthSignIn).setOnClickListener {
+            val key = editSplitwiseConsumerKey.text?.toString().orEmpty().trim()
+            val secret = editSplitwiseConsumerSecret.text?.toString().orEmpty().trim()
+            if (key.isBlank() || secret.isBlank()) {
+                Toast.makeText(this, "Consumer key and secret are required for OAuth", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            splitwiseStore.saveCredentials(key, secret)
+            SplitwiseWebAuthActivity.start(this, oauthMode = true)
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseSignOut).setOnClickListener {
+            splitwiseStore.signOut()
+            editSplitwiseApiKey.setText("")
+            bindSplitwiseUi()
+            Toast.makeText(this, "Signed out of Splitwise", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseSyncGroups).setOnClickListener {
+            syncSplitwiseGroups()
+        }
+        buttonSplitwiseDefaultGroup.setOnClickListener { pickDefaultSplitwiseGroup() }
+
+        if (intent.getBooleanExtra(SplitwiseOAuthActivity.EXTRA_OPEN_SPLITWISE_TAB, false)) {
+            tabLayoutAdmin.getTabAt(1)?.select()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(SplitwiseOAuthActivity.EXTRA_OPEN_SPLITWISE_TAB, false)) {
+            tabLayoutAdmin.getTabAt(1)?.select()
+            bindSplitwiseUi()
+        }
     }
 
     private fun setupTabs() {
-        val tabs = findViewById<TabLayout>(R.id.tabLayoutAdmin)
+        val tabs = tabLayoutAdmin
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_basics))
+        tabs.addTab(tabs.newTab().setText(R.string.admin_tab_splitwise))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_theme))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_laptop))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_rules))
@@ -253,12 +325,13 @@ class AdminActivity : AppCompatActivity() {
 
     private fun showPanel(index: Int) {
         panelBasics.visibility = if (index == 0) View.VISIBLE else View.GONE
-        panelTheme.visibility = if (index == 1) View.VISIBLE else View.GONE
-        panelLaptop.visibility = if (index == 2) View.VISIBLE else View.GONE
-        panelRules.visibility = if (index == 3) View.VISIBLE else View.GONE
-        panelTest.visibility = if (index == 4) View.VISIBLE else View.GONE
-        panelMaintenance.visibility = if (index == 5) View.VISIBLE else View.GONE
-        if (index == 2) {
+        panelSplitwise.visibility = if (index == 1) View.VISIBLE else View.GONE
+        panelTheme.visibility = if (index == 2) View.VISIBLE else View.GONE
+        panelLaptop.visibility = if (index == 3) View.VISIBLE else View.GONE
+        panelRules.visibility = if (index == 4) View.VISIBLE else View.GONE
+        panelTest.visibility = if (index == 5) View.VISIBLE else View.GONE
+        panelMaintenance.visibility = if (index == 6) View.VISIBLE else View.GONE
+        if (index == 3) {
             refreshLanStatusUi()
             lanUiHandler.removeCallbacks(lanUiTicker)
             if (LanServerState.get().running) {
@@ -267,6 +340,138 @@ class AdminActivity : AppCompatActivity() {
         } else {
             lanUiHandler.removeCallbacks(lanUiTicker)
         }
+        if (index == 1) bindSplitwiseUi()
+    }
+
+    private fun bindSplitwiseUi() {
+        val auth = splitwiseStore.load()
+        editSplitwiseCallback.setText(SplitwiseAuthStore.REDIRECT_URI)
+        // Don't overwrite a key the user is currently typing; only fill when empty.
+        if (editSplitwiseApiKey.text.isNullOrBlank() && auth.accessToken.isNotBlank()) {
+            editSplitwiseApiKey.setText(auth.accessToken)
+        }
+        if (editSplitwiseConsumerKey.text.isNullOrBlank()) {
+            editSplitwiseConsumerKey.setText(auth.consumerKey)
+        }
+        if (editSplitwiseConsumerSecret.text.isNullOrBlank()) {
+            editSplitwiseConsumerSecret.setText(auth.consumerSecret)
+        }
+        textSplitwiseStatus.text = if (auth.isSignedIn) {
+            getString(
+                R.string.splitwise_status_signed_in,
+                auth.currentUserName.ifBlank { "user #${auth.currentUserId}" }
+            )
+        } else {
+            getString(R.string.splitwise_status_signed_out)
+        }
+        textSplitwiseAuthMethod.text = when (auth.resolvedAuthMethod) {
+            SplitwiseAuthMethod.SESSION -> getString(R.string.splitwise_auth_method_session)
+            SplitwiseAuthMethod.OAUTH -> getString(R.string.splitwise_auth_method_oauth)
+            SplitwiseAuthMethod.TOKEN -> getString(R.string.splitwise_auth_method_token)
+            SplitwiseAuthMethod.NONE -> getString(R.string.splitwise_auth_method_none)
+        }
+        textSplitwiseGroups.text = getString(R.string.splitwise_groups_label, auth.groups.size)
+        val defaultName = auth.groupById(auth.defaultGroupId)?.name
+        buttonSplitwiseDefaultGroup.text = if (defaultName != null) {
+            "${getString(R.string.splitwise_default_group)}: $defaultName"
+        } else {
+            getString(R.string.splitwise_default_group)
+        }
+    }
+
+    private fun connectSplitwiseWithApiKey() {
+        val key = editSplitwiseApiKey.text?.toString().orEmpty().trim()
+        if (key.isBlank()) {
+            Toast.makeText(this, "Paste your personal API key first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    splitwiseStore.saveAccessToken(key)
+                    val api = SplitwiseApi.from(splitwiseStore)
+                    val user = api.getCurrentUser()
+                    splitwiseStore.saveCurrentUser(user.id, user.displayName)
+                    val groups = api.getGroups()
+                    splitwiseStore.saveGroups(groups)
+                }
+                bindSplitwiseUi()
+                Toast.makeText(this@AdminActivity, "Connected with API key", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@AdminActivity,
+                    "API key failed: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun saveSplitwiseCredentials(silent: Boolean = false) {
+        val key = editSplitwiseConsumerKey.text?.toString().orEmpty().trim()
+        val secret = editSplitwiseConsumerSecret.text?.toString().orEmpty().trim()
+        if (key.isBlank() || secret.isBlank()) {
+            Toast.makeText(this, "Consumer key and secret are required", Toast.LENGTH_SHORT).show()
+            return
+        }
+        splitwiseStore.saveCredentials(key, secret)
+        if (!silent) {
+            Toast.makeText(this, "Splitwise credentials saved", Toast.LENGTH_SHORT).show()
+        }
+        bindSplitwiseUi()
+    }
+
+    private fun syncSplitwiseGroups() {
+        val auth = splitwiseStore.load()
+        if (!auth.isSignedIn) {
+            Toast.makeText(this, R.string.splitwise_not_connected, Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val api = SplitwiseApi.from(splitwiseStore)
+                    val groups = api.getGroups()
+                    splitwiseStore.saveGroups(groups)
+                    val user = api.getCurrentUser()
+                    splitwiseStore.saveCurrentUser(user.id, user.displayName)
+                }
+                bindSplitwiseUi()
+                Toast.makeText(this@AdminActivity, "Groups refreshed", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                if (SplitwiseSessionEvents.isUnauthorized(e)) {
+                    bindSplitwiseUi()
+                    SplitwiseSessionEvents.promptReauth(this@AdminActivity)
+                } else {
+                    Toast.makeText(
+                        this@AdminActivity,
+                        "Refresh failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun pickDefaultSplitwiseGroup() {
+        val auth = splitwiseStore.load()
+        if (auth.groups.isEmpty()) {
+            Toast.makeText(this, "Refresh groups first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = listOf(getString(R.string.splitwise_group_none)) +
+            auth.groups.map { it.name }
+        val ids = listOf(0L) + auth.groups.map { it.id }
+        val checked = ids.indexOf(auth.defaultGroupId).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.splitwise_default_group)
+            .setSingleChoiceItems(labels.toTypedArray(), checked) { dialog, which ->
+                splitwiseStore.saveDefaultGroupId(ids[which])
+                bindSplitwiseUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun selectedLanDurationMinutes(): Int {
@@ -342,6 +547,9 @@ class AdminActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::splitwiseStore.isInitialized) {
+            bindSplitwiseUi()
+        }
         refreshLanStatusUi()
         if (panelLaptop.visibility == View.VISIBLE && LanServerState.get().running) {
             lanUiHandler.removeCallbacks(lanUiTicker)
@@ -357,7 +565,6 @@ class AdminActivity : AppCompatActivity() {
     private fun bindFromStore() {
         val config = configStore.load()
         editAccounts.setText(config.accounts.joinToString(", "))
-        editParticipants.setText(config.participants.joinToString(", "))
         switchMmFullSplitAsOwn.isChecked = config.mmFullSplitAsOwnExpense
         editDebtCategory.setText(config.debtCategory)
         editDebtSubcategory.setText(config.debtSubcategory)
@@ -462,7 +669,6 @@ class AdminActivity : AppCompatActivity() {
             configStore.save(
                 current.copy(
                     accounts = splitCsv(editAccounts.text?.toString()),
-                    participants = splitCsv(editParticipants.text?.toString()),
                     mmFullSplitAsOwnExpense = switchMmFullSplitAsOwn.isChecked,
                     debtCategory = editDebtCategory.text?.toString()?.trim().orEmpty()
                         .ifBlank { current.debtCategory },

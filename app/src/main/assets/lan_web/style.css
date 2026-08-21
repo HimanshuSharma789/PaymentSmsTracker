@@ -394,25 +394,49 @@ label { display: grid; gap: 6px; margin-bottom: 12px; font-weight: 600; font-siz
 }
 .detailStack {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 .detailBlock h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 13px;
   font-weight: 700;
   color: var(--accent);
 }
 .detailLabel {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
 }
+.detailLabel.tight,
+label.tight {
+  margin: 0 0 4px;
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.detailHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.groupSelect {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: #fff;
+}
+.memberChipsHost { margin-bottom: 4px; }
 .modeRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
 }
 .modeRow .detailLabel { margin: 0; }
 .modeSelectCompact {
@@ -500,7 +524,9 @@ label { display: grid; gap: 6px; margin-bottom: 12px; font-weight: 600; font-siz
   max-height: 180px;
   overflow: auto;
 }
-fieldset { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; background: #fafbfc; }
+fieldset { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 10px; padding: 10px 12px; background: #fafbfc; }
+fieldset legend { padding: 0 4px; font-weight: 600; color: var(--accent); }
+fieldset .chips { margin-top: 4px; }
 legend { padding: 0 6px; color: var(--accent-mid); font-weight: 600; }
 @media (max-width: 600px) {
   .top { flex-direction: column; }

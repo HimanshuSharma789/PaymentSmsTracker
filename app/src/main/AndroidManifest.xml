@@ -77,7 +77,29 @@
         <activity android:name=".TransactionEntryActivity" />
         <activity android:name=".TransactionListActivity" />
         <activity android:name=".SplitsActivity" />
-        <activity android:name=".AdminActivity" />
+        <activity
+            android:name=".AdminActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+
+        <activity
+            android:name=".splitwise.SplitwiseWebAuthActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".splitwise.SplitwiseOAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="oauth"
+                    android:pathPrefix="/splitwise"
+                    android:scheme="paymentsmstracker" />
+            </intent-filter>
+        </activity>
 
     </application>
 

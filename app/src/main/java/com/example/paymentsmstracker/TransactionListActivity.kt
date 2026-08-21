@@ -83,12 +83,15 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             db.transactionDao().deleteExportedOlderThan(ReviewStatus.EXPORTED, cutoff)
         }
 
+        if (intent.getStringExtra(EXTRA_FILTER) == "SPLITS") {
+            startActivity(Intent(this, SplitsActivity::class.java))
+            finish()
+            return
+        }
+
         val initialFilter = intent.getStringExtra(EXTRA_FILTER)?.let {
             runCatching { ListFilter.valueOf(it) }.getOrNull()
         } ?: ListFilter.NEEDS_REVIEW
-        if (intent.getStringExtra(EXTRA_FILTER) == "SPLITS") {
-            startActivity(Intent(this, SplitsActivity::class.java))
-        }
         transactionListViewModel.setFilter(initialFilter)
         checkFilterChip(initialFilter)
         setupFilterChips()
@@ -105,6 +108,18 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         }
         menuInflater.inflate(menuRes, menu)
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        if (selectionModeActive) {
+            val filter = transactionListViewModel.currentFilter()
+            menu.findItem(R.id.action_mark_reviewed_selected)?.isVisible =
+                filter == ListFilter.NEEDS_REVIEW
+            menu.findItem(R.id.action_export_selected)?.isVisible =
+                filter == ListFilter.REVIEWED
+            menu.findItem(R.id.action_delete_selected)?.isVisible = true
+        }
+        return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -125,20 +140,16 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 confirmMarkReviewedSelected()
                 true
             }
+            R.id.action_export_selected -> {
+                confirmExportSelected()
+                true
+            }
             R.id.action_delete_selected -> {
                 confirmDeleteSelected()
                 true
             }
             R.id.action_cancel_selection -> {
                 exitSelectionMode()
-                true
-            }
-            R.id.action_export_mm -> {
-                exportReviewedToMoneyManager()
-                true
-            }
-            R.id.action_export_splitwise -> {
-                exportSplitwise()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -150,7 +161,6 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         group.setOnCheckedStateChangeListener { _, checkedIds ->
             val filter = when (checkedIds.firstOrNull()) {
                 R.id.chipNeedsReview -> ListFilter.NEEDS_REVIEW
-                R.id.chipToday -> ListFilter.TODAY
                 R.id.chipReviewed -> ListFilter.REVIEWED
                 R.id.chipMmExported -> ListFilter.MM_EXPORTED
                 R.id.chipAll -> ListFilter.ALL
@@ -170,7 +180,6 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     private fun checkFilterChip(filter: ListFilter) {
         findViewById<Chip>(R.id.chipNeedsReview).isChecked = filter == ListFilter.NEEDS_REVIEW
-        findViewById<Chip>(R.id.chipToday).isChecked = filter == ListFilter.TODAY
         findViewById<Chip>(R.id.chipReviewed).isChecked = filter == ListFilter.REVIEWED
         findViewById<Chip>(R.id.chipMmExported).isChecked = filter == ListFilter.MM_EXPORTED
         findViewById<Chip>(R.id.chipAll).isChecked = filter == ListFilter.ALL
@@ -275,6 +284,22 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             .show()
     }
 
+    private fun confirmExportSelected() {
+        val ids = transactionAdapter.selectedIds()
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "No transactions selected", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.export_selected_title)
+            .setMessage(getString(R.string.export_selected_message, ids.size))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.export_selected) { _, _ ->
+                exportSelectedToMoneyManager(ids)
+            }
+            .show()
+    }
+
     private fun deleteSelected(ids: Set<Long>) {
         lifecycleScope.launch {
             val deleted = withContext(Dispatchers.IO) {
@@ -307,6 +332,49 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         }
     }
 
+    private fun exportSelectedToMoneyManager(ids: Set<Long>) {
+        lifecycleScope.launch {
+            val config = ConfigStore(this@TransactionListActivity).load()
+            val txs = withContext(Dispatchers.IO) {
+                db.transactionDao().getTransactionsByStatusList(ReviewStatus.REVIEWED)
+                    .filter { it.id in ids }
+            }
+            if (txs.isEmpty()) {
+                Toast.makeText(
+                    this@TransactionListActivity,
+                    "No reviewed transactions selected",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            val tsv = MoneyManagerExporter.toTsv(txs, config)
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "money_manager_import_$stamp.tsv"
+            FileHandler().saveTextFile(
+                this@TransactionListActivity,
+                fileName,
+                tsv,
+                mimeType = "text/tab-separated-values"
+            )
+            val splitCount = txs.count { SplitwiseExporter.isSplit(it) }
+            withContext(Dispatchers.IO) {
+                db.transactionDao().updateStatusForIds(
+                    txs.map { it.id },
+                    ReviewStatus.EXPORTED,
+                    System.currentTimeMillis()
+                )
+            }
+            val message = if (splitCount > 0) {
+                getString(R.string.export_selected_done_with_splits, txs.size, fileName, splitCount)
+            } else {
+                getString(R.string.export_selected_done, txs.size, fileName)
+            }
+            Toast.makeText(this@TransactionListActivity, message, Toast.LENGTH_LONG).show()
+            exitSelectionMode()
+            findViewById<Chip>(R.id.chipMmExported).isChecked = true
+        }
+    }
+
     override fun onTransactionItemClick(transactionId: Long) {
         startActivity(
             Intent(this, TransactionEntryActivity::class.java).apply {
@@ -323,74 +391,6 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     override fun onSelectionChanged(selectedCount: Int) {
         if (selectionModeActive) {
             refreshSelectionTitle(selectedCount)
-        }
-    }
-
-    private fun exportReviewedToMoneyManager() {
-        lifecycleScope.launch {
-            val config = ConfigStore(this@TransactionListActivity).load()
-            val txs = withContext(Dispatchers.IO) {
-                db.transactionDao().getTransactionsByStatusList(ReviewStatus.REVIEWED)
-            }
-            if (txs.isEmpty()) {
-                Toast.makeText(
-                    this@TransactionListActivity,
-                    "No reviewed transactions",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return@launch
-            }
-            val tsv = MoneyManagerExporter.toTsv(txs, config)
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "money_manager_import_$stamp.tsv"
-            FileHandler().saveTextFile(
-                this@TransactionListActivity,
-                fileName,
-                tsv,
-                mimeType = "text/tab-separated-values"
-            )
-            withContext(Dispatchers.IO) {
-                db.transactionDao().updateStatusForIds(
-                    txs.map { it.id },
-                    ReviewStatus.EXPORTED,
-                    System.currentTimeMillis()
-                )
-            }
-            Toast.makeText(
-                this@TransactionListActivity,
-                "Moved ${txs.size} to MM exported → Downloads/$fileName",
-                Toast.LENGTH_LONG
-            ).show()
-            findViewById<Chip>(R.id.chipMmExported).isChecked = true
-        }
-    }
-
-    private fun exportSplitwise() {
-        lifecycleScope.launch {
-            val txs = withContext(Dispatchers.IO) {
-                db.transactionDao().getAllTransactionsList().filter {
-                    (it.reviewStatus == ReviewStatus.REVIEWED ||
-                        it.reviewStatus == ReviewStatus.EXPORTED) &&
-                        SplitwiseExporter.isSplit(it)
-                }
-            }
-            if (txs.isEmpty()) {
-                Toast.makeText(
-                    this@TransactionListActivity,
-                    "No reviewed split transactions",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return@launch
-            }
-            val csv = SplitwiseExporter.toCsv(txs, onlySplits = true)
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "splitwise_import_$stamp.csv"
-            FileHandler().saveCsvFileToDownloads(this@TransactionListActivity, fileName, csv)
-            Toast.makeText(
-                this@TransactionListActivity,
-                "Exported ${txs.size} splits → Downloads/$fileName",
-                Toast.LENGTH_LONG
-            ).show()
         }
     }
 

@@ -53,7 +53,6 @@ class ConfigStore(context: Context) {
         }
         return JSONObject()
             .put("accounts", JSONArray(config.accounts))
-            .put("participants", JSONArray(config.participants))
             .put("incomeCategories", JSONArray(config.incomeCategories))
             .put("expenseCategories", categories)
             .put("debtCategory", config.debtCategory)
@@ -69,10 +68,12 @@ class ConfigStore(context: Context) {
     }
 
     private fun fromJson(obj: JSONObject): AppConfig {
-        val accounts = obj.optJSONArray("accounts")?.toStringList()
+        val loadedAccounts = obj.optJSONArray("accounts")?.toStringList()
             ?: AppConfig.DEFAULT_ACCOUNTS
-        val participants = obj.optJSONArray("participants")?.toStringList()
-            ?: AppConfig.DEFAULT_PARTICIPANTS
+        val existingAccountKeys = loadedAccounts.map { it.lowercase() }.toSet()
+        val accounts = loadedAccounts + AppConfig.DEFAULT_ACCOUNTS.filter {
+            it.lowercase() !in existingAccountKeys
+        }
         val income = obj.optJSONArray("incomeCategories")?.toStringList()
             ?: AppConfig.DEFAULT_INCOME_CATEGORIES
 
@@ -129,7 +130,6 @@ class ConfigStore(context: Context) {
 
         return AppConfig(
             accounts = accounts,
-            participants = participants,
             expenseCategories = categories,
             incomeCategories = income,
             debtCategory = obj.optString("debtCategory", "Social Life"),
