@@ -223,8 +223,25 @@ class SplitCalculatorTest {
         assertEquals("40.00", row.myShare)
         assertEquals("60.00", row.friendsOwe)
         assertTrue(row.people.contains("Percentage"))
-        assertEquals("Pending", row.status)
+        assertFalse(row.pushed)
+        assertEquals("", row.error)
         assertFalse(row.failed)
+    }
+
+    @Test
+    fun splitTableMarksPushedAsSuccess() {
+        val tx = Transaction(
+            id = 10L,
+            amount = 80.0,
+            merchantName = "Dinner",
+            timestamp = 1_720_000_000_000L,
+            participants = "ME,PUNEET",
+            splitwiseExpenseId = 555L
+        )
+        val row = SplitTableAdapter.fromTransaction(tx)
+        assertTrue(row.pushed)
+        assertFalse(row.failed)
+        assertEquals("", row.error)
     }
 
     @Test

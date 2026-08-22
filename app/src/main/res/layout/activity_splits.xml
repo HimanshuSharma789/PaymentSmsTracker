@@ -16,7 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/outline_arrow_back_24"
-            app:title="@string/pending_splits_title" />
+            app:title="@string/splits_title" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
@@ -25,121 +25,87 @@
         android:orientation="vertical"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fillViewport="true"
-            android:scrollbars="horizontal">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:padding="4dp">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/colorSurfaceVariant"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="6dp"
-                    android:paddingVertical="6dp">
-
-                    <TextView
-                        android:layout_width="40dp"
-                        android:layout_height="wrap_content"
-                        android:text="" />
-
-                    <TextView
-                        android:layout_width="72dp"
-                        android:layout_height="wrap_content"
-                        android:text="@string/col_date"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="120dp"
-                        android:layout_height="wrap_content"
-                        android:text="@string/col_merchant"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="72dp"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/col_total"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="64dp"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/col_my_share"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="72dp"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/col_friends_owe"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="140dp"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="6dp"
-                        android:text="@string/col_people"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="140dp"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="6dp"
-                        android:text="@string/col_status"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recyclerSplitsTable"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    tools:listitem="@layout/item_split_row" />
-            </LinearLayout>
-        </HorizontalScrollView>
-
-        <TextView
-            android:id="@+id/textSplitsEmpty"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupSplits"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:padding="12dp"
-            android:text="@string/no_splits_yet"
-            android:visibility="gone" />
+            android:paddingHorizontal="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipSplitsPending"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/splits_filter_pending" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipSplitsSuccess"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/splits_filter_success" />
+        </com.google.android.material.chip.ChipGroup>
 
         <TextView
             android:id="@+id/textSplitsSummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="6dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            tools:text="3 splits · friends owe ₹225.00" />
+            android:background="?attr/colorSurfaceVariant"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            tools:text="3 pending · friends owe ₹225.00" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerSplitsTable"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="6dp"
+                android:paddingBottom="8dp"
+                tools:listitem="@layout/item_split_row" />
+
+            <TextView
+                android:id="@+id/textSplitsEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="24dp"
+                android:text="@string/no_splits_yet"
+                android:textColor="?android:textColorSecondary"
+                android:visibility="gone"
+                tools:visibility="visible" />
+        </FrameLayout>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonPushSplitwiseFromSplits"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="8dp"
             android:text="@string/splitwise_select_and_push" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonExportSplitwiseFromSplits"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginHorizontal="12dp"
             android:layout_marginBottom="8dp"
             android:text="@string/export_splitwise" />
     </LinearLayout>

@@ -19,7 +19,7 @@ import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
-import com.example.paymentsmstracker.export.MoneyManagerExporter
+import com.example.paymentsmstracker.export.MoneyManagerSync
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.reminder.NightlyReviewScheduler
 import com.example.paymentsmstracker.server.LanAccessService
@@ -821,24 +821,13 @@ class AdminActivity : AppCompatActivity() {
                 Toast.makeText(this@AdminActivity, "No reviewed transactions", Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "money_manager_import_$stamp.tsv"
-            FileHandler().saveTextFile(
-                this@AdminActivity,
-                fileName,
-                MoneyManagerExporter.toTsv(txs, config),
-                mimeType = "text/tab-separated-values"
+            MoneyManagerSync.syncToMoneyManager(
+                activity = this@AdminActivity,
+                transactions = txs,
+                config = config,
+                transactionDao = db.transactionDao(),
+                markExported = markExported
             )
-            if (markExported) {
-                withContext(Dispatchers.IO) {
-                    db.transactionDao().updateStatusForIds(
-                        txs.map { it.id },
-                        ReviewStatus.EXPORTED,
-                        System.currentTimeMillis()
-                    )
-                }
-            }
-            Toast.makeText(this@AdminActivity, "Exported ${txs.size} → $fileName", Toast.LENGTH_LONG).show()
         }
     }
 

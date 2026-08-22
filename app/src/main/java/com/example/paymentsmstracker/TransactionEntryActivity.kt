@@ -372,6 +372,12 @@ class TransactionEntryActivity : AppCompatActivity() {
             getString(if (transfer) R.string.transfer_from else R.string.account)
         }
         buttonPickType.text = selectedType.ifBlank { getString(R.string.transaction_type) }
+        val typeColor = when (MoneyManagerExporter.normalizeType(selectedType)) {
+            "Income" -> getColor(R.color.transaction_income)
+            "Transfer-Out" -> getColor(R.color.transaction_transfer)
+            else -> buttonPickAccount.currentTextColor
+        }
+        buttonPickType.setTextColor(typeColor)
         buttonPickCategory.text = selectedCategory.ifBlank {
             getString(if (transfer) R.string.transfer_to else R.string.category)
         }
@@ -683,7 +689,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 amountEditText.setText(tx.amount.toString())
                 merchantEditText.setText(tx.merchantName)
                 selectedAccount = tx.account
-                selectedType = tx.transactionType.ifBlank { "Expense" }
+                selectedType = MoneyManagerExporter.normalizeType(tx.transactionType)
                 selectedCategory = tx.category
                 selectedSubcategory = tx.subcategory
                 notesEditText.setText(tx.notes.orEmpty())
@@ -884,7 +890,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 SplitCalculator.encodeAllocations(allocations, idMap)
             },
             reviewStatus = status,
-            transactionType = selectedType,
+            transactionType = MoneyManagerExporter.normalizeType(selectedType),
             splitwiseGroupId = if (transfer || participants.isEmpty()) 0L else selectedSplitwiseGroupId,
             splitwiseExpenseId = selectedSplitwiseExpenseId,
             splitwiseParticipantIds = Transaction.encodeParticipantIds(idMap),

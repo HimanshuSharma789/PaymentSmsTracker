@@ -4,14 +4,17 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paymentsmstracker.R
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.color.MaterialColors
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -117,6 +120,18 @@ class TransactionAdapter(
             merchantTextView.text = transaction.merchantName
             val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
             amountTextView.text = currencyFormat.format(transaction.amount)
+            val type = MoneyManagerExporter.normalizeType(transaction.transactionType)
+            amountTextView.setTextColor(
+                when (type) {
+                    "Income" -> ContextCompat.getColor(itemView.context, R.color.transaction_income)
+                    "Transfer-Out" ->
+                        ContextCompat.getColor(itemView.context, R.color.transaction_transfer)
+                    else -> MaterialColors.getColor(
+                        itemView,
+                        com.google.android.material.R.attr.colorOnSurface
+                    )
+                }
+            )
 
             val previousTransaction = if (bindingAdapterPosition > 0) {
                 getItem(bindingAdapterPosition - 1)
@@ -135,14 +150,13 @@ class TransactionAdapter(
             val timeLabel = SimpleDateFormat("h:mm a", Locale.getDefault())
                 .format(Date(transaction.timestamp))
             val categoryLabel = buildString {
-                if (transaction.account.isNotBlank()) append(transaction.account)
+                append(type)
+                if (transaction.account.isNotBlank()) append(" · ${transaction.account}")
                 if (transaction.category.isNotBlank()) {
-                    if (isNotEmpty()) append(" · ")
-                    append(transaction.category)
+                    append(" · ${transaction.category}")
                     if (transaction.subcategory.isNotBlank()) append(" / ${transaction.subcategory}")
                 }
-                if (isEmpty()) append("Uncategorized")
-                if (isNotEmpty()) append(" · ")
+                append(" · ")
                 append(timeLabel)
             }
             categoryTextView.text = categoryLabel

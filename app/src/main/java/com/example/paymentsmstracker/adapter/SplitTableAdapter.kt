@@ -1,9 +1,11 @@
 package com.example.paymentsmstracker.adapter
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -11,7 +13,9 @@ import com.example.paymentsmstracker.R
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.color.MaterialColors
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -26,7 +30,8 @@ data class SplitRowUi(
     val myShare: String,
     val friendsOwe: String,
     val people: String,
-    val status: String,
+    val pushed: Boolean,
+    val error: String,
     val failed: Boolean
 )
 
@@ -37,6 +42,7 @@ class SplitTableAdapter(
 
     private var selectionMode = false
     private val selected = linkedSetOf<Long>()
+    private var allowSelection = true
 
     object Diff : DiffUtil.ItemCallback<SplitRowUi>() {
         override fun areItemsTheSame(oldItem: SplitRowUi, newItem: SplitRowUi) = oldItem.id == newItem.id
@@ -44,21 +50,29 @@ class SplitTableAdapter(
     }
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
+        val card: MaterialCardView = view.findViewById(R.id.cardSplitRow)
         val check: MaterialCheckBox = view.findViewById(R.id.checkSplitSelect)
-        val date: TextView = view.findViewById(R.id.textSplitDate)
         val merchant: TextView = view.findViewById(R.id.textSplitMerchant)
-        val total: TextView = view.findViewById(R.id.textSplitTotal)
-        val myShare: TextView = view.findViewById(R.id.textSplitMyShare)
+        val meta: TextView = view.findViewById(R.id.textSplitMeta)
+        val breakdown: TextView = view.findViewById(R.id.textSplitBreakdown)
         val friendsOwe: TextView = view.findViewById(R.id.textSplitFriendsOwe)
-        val people: TextView = view.findViewById(R.id.textSplitPeople)
         val status: TextView = view.findViewById(R.id.textSplitStatus)
+        val error: TextView = view.findViewById(R.id.textSplitError)
     }
 
     fun isSelectionMode(): Boolean = selectionMode
 
     fun selectedIds(): Set<Long> = selected.toSet()
 
+    fun setAllowSelection(allow: Boolean) {
+        allowSelection = allow
+        if (!allow && selectionMode) {
+            exitSelectionMode()
+        }
+    }
+
     fun enterSelectionMode(initialId: Long? = null) {
+        if (!allowSelection) return
         selectionMode = true
         if (initialId != null) selected.add(initialId)
         notifyDataSetChanged()
@@ -86,26 +100,53 @@ class SplitTableAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val row = getItem(position)
-        holder.date.text = row.date
+        val context = holder.itemView.context
         holder.merchant.text = row.merchant
-        holder.total.text = row.total
-        holder.myShare.text = row.myShare
-        holder.friendsOwe.text = row.friendsOwe
-        holder.people.text = row.people
-        holder.status.text = row.status
-        holder.status.setTextColor(
-            if (row.failed) {
-                holder.itemView.context.getColor(android.R.color.holo_red_dark)
-            } else {
-                holder.itemView.context.getColor(android.R.color.darker_gray)
+        holder.meta.text = buildString {
+            append(row.date)
+            if (row.people.isNotBlank()) {
+                append(" · ")
+                append(row.people)
             }
-        )
+        }
+        holder.breakdown.text =
+            context.getString(R.string.split_row_breakdown, row.total, row.myShare)
+        holder.friendsOwe.text = context.getString(R.string.split_row_amount, row.friendsOwe)
+
+        val statusLabel: Int
+        val statusBackground: Int
+        val statusForeground: Int
+        when {
+            row.failed -> {
+                statusLabel = R.string.split_status_failed
+                statusBackground = R.color.split_status_failed_bg
+                statusForeground = R.color.split_status_failed_fg
+            }
+            row.pushed -> {
+                statusLabel = R.string.split_status_pushed
+                statusBackground = R.color.split_status_pushed_bg
+                statusForeground = R.color.split_status_pushed_fg
+            }
+            else -> {
+                statusLabel = R.string.split_status_pending
+                statusBackground = R.color.split_status_pending_bg
+                statusForeground = R.color.split_status_pending_fg
+            }
+        }
+        holder.status.setText(statusLabel)
+        holder.status.backgroundTintList =
+            ColorStateList.valueOf(ContextCompat.getColor(context, statusBackground))
+        holder.status.setTextColor(ContextCompat.getColor(context, statusForeground))
+
+        holder.error.visibility = if (row.error.isBlank()) View.GONE else View.VISIBLE
+        holder.error.text = row.error
 
         holder.check.visibility = if (selectionMode) View.VISIBLE else View.GONE
         holder.check.setOnCheckedChangeListener(null)
         holder.check.isChecked = selected.contains(row.id)
         holder.check.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) selected.add(row.id) else selected.remove(row.id)
+            applySelectionStroke(holder, row.id)
             onSelectionChanged(selected.size)
         }
 
@@ -117,14 +158,29 @@ class SplitTableAdapter(
             }
         }
         holder.itemView.setOnLongClickListener {
-            if (!selectionMode) {
+            if (!allowSelection) {
+                false
+            } else if (!selectionMode) {
                 enterSelectionMode(row.id)
                 true
             } else {
                 false
             }
         }
-        holder.itemView.setBackgroundColor(if (position % 2 == 0) 0x00000000 else 0x12000000)
+        applySelectionStroke(holder, row.id)
+    }
+
+    private fun applySelectionStroke(holder: VH, id: Long) {
+        holder.card.setStrokeColor(
+            MaterialColors.getColor(
+                holder.card,
+                if (selectionMode && selected.contains(id)) {
+                    com.google.android.material.R.attr.colorPrimary
+                } else {
+                    com.google.android.material.R.attr.colorOutlineVariant
+                }
+            )
+        )
     }
 
     companion object {
@@ -151,11 +207,6 @@ class SplitTableAdapter(
                 }
             }
             val failed = tx.splitwisePushError.isNotBlank()
-            val status = when {
-                tx.splitwiseExpenseId > 0L -> "Pushed"
-                failed -> "Failed · ${tx.splitwisePushError}"
-                else -> "Pending"
-            }
             return SplitRowUi(
                 id = tx.id,
                 date = date,
@@ -164,7 +215,8 @@ class SplitTableAdapter(
                 myShare = myShare.toPlainString(),
                 friendsOwe = friends.toPlainString(),
                 people = peopleLabel,
-                status = status,
+                pushed = tx.splitwiseExpenseId > 0L,
+                error = tx.splitwisePushError,
                 failed = failed
             )
         }

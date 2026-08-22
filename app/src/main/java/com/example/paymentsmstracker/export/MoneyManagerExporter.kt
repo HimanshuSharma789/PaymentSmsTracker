@@ -22,6 +22,8 @@ data class MoneyManagerRow(
 
 object MoneyManagerExporter {
 
+    private val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH)
+
     val HEADERS = listOf(
         "Date",
         "Account",
@@ -33,10 +35,35 @@ object MoneyManagerExporter {
         "Description"
     )
 
+    /**
+     * Income/Expense column: Income, Expense, Transfer-Out.
+     * "Expenses" (plural) is treated as Expense.
+     */
+    fun toMoneyManagerType(transactionType: String): String = when (normalizeType(transactionType)) {
+        "Income" -> "Income"
+        "Transfer-Out" -> "Transfer-Out"
+        else -> "Expense"
+    }
+
+    /** Collapse aliases / blanks to the three internal types. */
+    fun normalizeType(transactionType: String): String {
+        val key = transactionType.trim().lowercase()
+            .replace(" ", "")
+            .replace("_", "")
+            .replace("-", "")
+        return when (key) {
+            "income" -> "Income"
+            "transferout", "transfer" -> "Transfer-Out"
+            else -> "Expense"
+        }
+    }
+
+    fun formatDate(timestamp: Long): String =
+        dateFormat.format(Date(timestamp))
+
     fun expandTransaction(transaction: Transaction, config: AppConfig): List<MoneyManagerRow> {
-        val date = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
-            .format(Date(transaction.timestamp))
-        val type = transaction.transactionType.ifBlank { "Expense" }
+        val date = formatDate(transaction.timestamp)
+        val type = normalizeType(transaction.transactionType)
         val note = transaction.notes.orEmpty()
         val description = transaction.merchantName
         val account = transaction.account.ifBlank { "Cash" }
@@ -57,7 +84,7 @@ object MoneyManagerExporter {
                     subcategory = if (type == "Transfer-Out") "" else transaction.subcategory,
                     note = note,
                     amount = amount.toPlainString(),
-                    incomeExpense = type,
+                    incomeExpense = toMoneyManagerType(type),
                     description = description
                 )
             )
@@ -73,7 +100,7 @@ object MoneyManagerExporter {
                     subcategory = transaction.subcategory,
                     note = note,
                     amount = amount.toPlainString(),
-                    incomeExpense = "Expense",
+                    incomeExpense = toMoneyManagerType("Expense"),
                     description = description
                 )
             )
@@ -93,7 +120,7 @@ object MoneyManagerExporter {
                         append("Split: ${participants.joinToString(",")}")
                     },
                     amount = amount.toPlainString(),
-                    incomeExpense = "Expense",
+                    incomeExpense = toMoneyManagerType("Expense"),
                     description = description
                 )
             )
@@ -118,7 +145,7 @@ object MoneyManagerExporter {
                     subcategory = transaction.subcategory,
                     note = note,
                     amount = personalShare.toPlainString(),
-                    incomeExpense = "Expense",
+                    incomeExpense = toMoneyManagerType("Expense"),
                     description = description
                 )
             )
@@ -136,7 +163,7 @@ object MoneyManagerExporter {
                         append("Split: ${participants.joinToString(",")}")
                     },
                     amount = debtShare.toPlainString(),
-                    incomeExpense = "Expense",
+                    incomeExpense = toMoneyManagerType("Expense"),
                     description = description
                 )
             )

@@ -91,7 +91,7 @@
                     android:maxLines="1"
                     android:textColor="?android:textColorSecondary"
                     android:textSize="12sp"
-                    tools:text="HSBC · Food / Lunch" />
+                    tools:text="Expense · HSBC · Food / Lunch" />
 
                 <TextView
                     android:id="@+id/textViewStatus"

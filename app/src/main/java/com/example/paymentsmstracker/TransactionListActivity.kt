@@ -19,8 +19,7 @@ import com.example.paymentsmstracker.adapter.TransactionAdapter
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
-import com.example.paymentsmstracker.export.MoneyManagerExporter
-import com.example.paymentsmstracker.export.SplitwiseExporter
+import com.example.paymentsmstracker.export.MoneyManagerSync
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.example.paymentsmstracker.viewmodel.TransactionListViewModel
 import com.google.android.material.appbar.MaterialToolbar
@@ -29,9 +28,6 @@ import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListener {
@@ -347,31 +343,17 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 ).show()
                 return@launch
             }
-            val tsv = MoneyManagerExporter.toTsv(txs, config)
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "money_manager_import_$stamp.tsv"
-            FileHandler().saveTextFile(
-                this@TransactionListActivity,
-                fileName,
-                tsv,
-                mimeType = "text/tab-separated-values"
+            val outcome = MoneyManagerSync.syncToMoneyManager(
+                activity = this@TransactionListActivity,
+                transactions = txs,
+                config = config,
+                transactionDao = db.transactionDao(),
+                markExported = true
             )
-            val splitCount = txs.count { SplitwiseExporter.isSplit(it) }
-            withContext(Dispatchers.IO) {
-                db.transactionDao().updateStatusForIds(
-                    txs.map { it.id },
-                    ReviewStatus.EXPORTED,
-                    System.currentTimeMillis()
-                )
+            if (outcome != null) {
+                exitSelectionMode()
+                findViewById<Chip>(R.id.chipMmExported).isChecked = true
             }
-            val message = if (splitCount > 0) {
-                getString(R.string.export_selected_done_with_splits, txs.size, fileName, splitCount)
-            } else {
-                getString(R.string.export_selected_done, txs.size, fileName)
-            }
-            Toast.makeText(this@TransactionListActivity, message, Toast.LENGTH_LONG).show()
-            exitSelectionMode()
-            findViewById<Chip>(R.id.chipMmExported).isChecked = true
         }
     }
 
