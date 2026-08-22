@@ -10,4 +10,13 @@
 
     <!-- Launcher icon (matches PNG navy) -->
     <color name="ic_launcher_background">#1B284D</color>
+    <color name="transaction_income">#15803D</color>
+    <color name="transaction_transfer">#1D4ED8</color>
+
+    <color name="split_status_pending_bg">#FEF3C7</color>
+    <color name="split_status_pending_fg">#B45309</color>
+    <color name="split_status_pushed_bg">#DCFCE7</color>
+    <color name="split_status_pushed_fg">#15803D</color>
+    <color name="split_status_failed_bg">#FEE2E2</color>
+    <color name="split_status_failed_fg">#B91C1C</color>
 </resources>

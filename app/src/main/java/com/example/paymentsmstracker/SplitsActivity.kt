@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.paymentsmstracker.adapter.SplitRowUi
 import com.example.paymentsmstracker.adapter.SplitTableAdapter
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.export.SplitwiseExporter
@@ -21,6 +22,8 @@ import com.example.paymentsmstracker.splitwise.SplitwisePusher
 import com.example.paymentsmstracker.splitwise.SplitwiseSessionEvents
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -32,12 +35,17 @@ import java.util.Locale
 
 class SplitsActivity : AppCompatActivity() {
 
+    private enum class SplitFilter { PENDING, SUCCESS }
+
     private lateinit var adapter: SplitTableAdapter
     private lateinit var empty: TextView
     private lateinit var summary: TextView
     private lateinit var pushButton: MaterialButton
+    private lateinit var exportButton: MaterialButton
     private var selectionModeActive = false
     private var lastCount = 0
+    private var filter = SplitFilter.PENDING
+    private var allRows: List<SplitRowUi> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +62,7 @@ class SplitsActivity : AppCompatActivity() {
         empty = findViewById(R.id.textSplitsEmpty)
         summary = findViewById(R.id.textSplitsSummary)
         pushButton = findViewById(R.id.buttonPushSplitwiseFromSplits)
+        exportButton = findViewById(R.id.buttonExportSplitwiseFromSplits)
         val recycler: RecyclerView = findViewById(R.id.recyclerSplitsTable)
         adapter = SplitTableAdapter(
             onOpen = { id ->
@@ -69,9 +78,9 @@ class SplitsActivity : AppCompatActivity() {
         )
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.adapter = adapter
-        recycler.isNestedScrollingEnabled = false
+        setupFilterChips()
 
-        findViewById<MaterialButton>(R.id.buttonExportSplitwiseFromSplits).setOnClickListener {
+        exportButton.setOnClickListener {
             exportSplitwise()
         }
         pushButton.setOnClickListener {
@@ -84,44 +93,87 @@ class SplitsActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             AppDatabase.getDatabase(applicationContext).transactionDao()
-                .getPendingSplitTransactions()
+                .getSplitsForTable()
                 .collectLatest { txs ->
-                    val rows = txs.map { SplitTableAdapter.fromTransaction(it) }
-                    adapter.submitList(rows)
-                    empty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
-                    lastCount = rows.size
-                    val friendsTotal = rows.fold(BigDecimal.ZERO) { acc, row ->
-                        acc.add(BigDecimal(row.friendsOwe))
-                    }
-                    val failed = rows.count { it.failed }
-                    summary.text = if (rows.isEmpty()) {
-                        getString(R.string.no_pending_splits)
-                    } else {
-                        buildString {
-                            append(
-                                getString(
-                                    R.string.pending_splits_summary,
-                                    rows.size,
-                                    friendsTotal.setScale(2).toPlainString()
-                                )
-                            )
-                            if (failed > 0) {
-                                append(" · ")
-                                append(getString(R.string.pending_splits_failed_count, failed))
-                            }
-                        }
-                    }
-                    if (!selectionModeActive) {
-                        supportActionBar?.subtitle = if (rows.isEmpty()) {
-                            null
-                        } else {
-                            getString(R.string.list_count_items, rows.size)
-                        }
-                    }
-                    if (selectionModeActive && rows.isEmpty()) {
-                        exitSelectionMode()
-                    }
+                    allRows = txs.map { SplitTableAdapter.fromTransaction(it) }
+                    renderVisibleRows()
                 }
+        }
+    }
+
+    private fun setupFilterChips() {
+        val group = findViewById<ChipGroup>(R.id.chipGroupSplits)
+        group.setOnCheckedStateChangeListener { _, checkedIds ->
+            filter = when (checkedIds.firstOrNull()) {
+                R.id.chipSplitsSuccess -> SplitFilter.SUCCESS
+                else -> SplitFilter.PENDING
+            }
+            if (checkedIds.isEmpty()) {
+                findViewById<Chip>(R.id.chipSplitsPending).isChecked = true
+            }
+            if (selectionModeActive) {
+                exitSelectionMode()
+            }
+            renderVisibleRows()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun visibleRows(): List<SplitRowUi> = allRows.filter { row ->
+        if (filter == SplitFilter.SUCCESS) row.pushed else !row.pushed
+    }
+
+    private fun isPendingTab(): Boolean = filter == SplitFilter.PENDING
+
+    private fun renderVisibleRows() {
+        val rows = visibleRows()
+        adapter.submitList(rows)
+        empty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
+        empty.setText(
+            if (isPendingTab()) R.string.no_pending_splits else R.string.no_success_splits
+        )
+        lastCount = rows.size
+        val friendsTotal = rows.fold(BigDecimal.ZERO) { acc, row ->
+            acc.add(BigDecimal(row.friendsOwe))
+        }
+        summary.text = if (rows.isEmpty()) {
+            empty.text
+        } else if (isPendingTab()) {
+            buildString {
+                append(
+                    getString(
+                        R.string.pending_splits_summary,
+                        rows.size,
+                        friendsTotal.setScale(2).toPlainString()
+                    )
+                )
+                val failed = rows.count { it.failed }
+                if (failed > 0) {
+                    append(" · ")
+                    append(getString(R.string.pending_splits_failed_count, failed))
+                }
+            }
+        } else {
+            getString(
+                R.string.success_splits_summary,
+                rows.size,
+                friendsTotal.setScale(2).toPlainString()
+            )
+        }
+        val showPushActions = isPendingTab()
+        adapter.setAllowSelection(showPushActions)
+        pushButton.visibility = if (showPushActions) View.VISIBLE else View.GONE
+        exportButton.visibility = if (showPushActions) View.VISIBLE else View.GONE
+        if (!selectionModeActive) {
+            supportActionBar?.title = getString(R.string.splits_title)
+            supportActionBar?.subtitle = if (rows.isEmpty()) {
+                null
+            } else {
+                getString(R.string.list_count_items, rows.size)
+            }
+        }
+        if (selectionModeActive && (rows.isEmpty() || !isPendingTab())) {
+            exitSelectionMode()
         }
     }
 
@@ -131,6 +183,14 @@ class SplitsActivity : AppCompatActivity() {
             menu
         )
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        if (!selectionModeActive) {
+            menu.findItem(R.id.action_select_pending_splits)?.isVisible = isPendingTab()
+            menu.findItem(R.id.action_export_pending_csv)?.isVisible = isPendingTab()
+        }
+        return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -160,6 +220,10 @@ class SplitsActivity : AppCompatActivity() {
     }
 
     private fun startSelectionMode() {
+        if (!isPendingTab()) {
+            Toast.makeText(this, R.string.splits_already_pushed, Toast.LENGTH_SHORT).show()
+            return
+        }
         if (adapter.currentList.isEmpty()) {
             Toast.makeText(this, R.string.no_pending_splits, Toast.LENGTH_SHORT).show()
             return
@@ -176,7 +240,7 @@ class SplitsActivity : AppCompatActivity() {
         selectionModeActive = false
         adapter.exitSelectionMode()
         pushButton.setText(R.string.splitwise_select_and_push)
-        supportActionBar?.title = getString(R.string.pending_splits_title)
+        supportActionBar?.title = getString(R.string.splits_title)
         supportActionBar?.subtitle =
             if (lastCount > 0) getString(R.string.list_count_items, lastCount) else null
         invalidateOptionsMenu()
@@ -192,6 +256,10 @@ class SplitsActivity : AppCompatActivity() {
     }
 
     private fun confirmPushSelected() {
+        if (!isPendingTab()) {
+            Toast.makeText(this, R.string.splits_already_pushed, Toast.LENGTH_SHORT).show()
+            return
+        }
         val ids = adapter.selectedIds()
         if (ids.isEmpty()) {
             Toast.makeText(this, R.string.no_transactions_selected, Toast.LENGTH_SHORT).show()

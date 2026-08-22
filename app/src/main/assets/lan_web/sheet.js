@@ -19,15 +19,22 @@
   const selectAll = document.getElementById("selectAll");
   const COLSPAN = 11;
 
+  function normalizeType(type) {
+    const key = String(type || "Expense").trim().toLowerCase().replace(/[\s_-]/g, "");
+    if (key === "income") return "Income";
+    if (key === "transferout" || key === "transfer") return "Transfer-Out";
+    return "Expense";
+  }
+
   function typeOptions(selected) {
-    const cur = selected || "Expense";
+    const cur = normalizeType(selected);
     return ["Expense", "Income", "Transfer-Out"].map((t) =>
       `<option value="${t}" ${t === cur ? "selected" : ""}>${t}</option>`
     ).join("");
   }
 
   function isTransferType(type) {
-    return type === "Transfer-Out";
+    return normalizeType(type) === "Transfer-Out";
   }
 
   function categoryChoices(type) {
@@ -192,7 +199,7 @@
         return false;
       }
       if (subcategory && (tx.subcategory || "") !== subcategory) return false;
-      if (type && (tx.transactionType || "Expense") !== type) return false;
+      if (type && normalizeType(tx.transactionType) !== type) return false;
       return true;
     });
   }
@@ -528,7 +535,7 @@
     updateFilterCount(filtered.length, items.length);
     const accounts = meta.accounts || [];
     sheetBody.innerHTML = filtered.map((tx) => {
-      const type = tx.transactionType || "Expense";
+      const type = normalizeType(tx.transactionType);
       const transfer = isTransferType(type);
       const categories = categoryChoices(type);
       const subs = (!transfer && type === "Expense" && meta.expenseCategories)
@@ -713,7 +720,9 @@
     const original = items.find((tx) => String(tx.id) === String(row.dataset.id));
     const detail = detailRow(row.dataset.id);
     const d = get("timestamp").value ? new Date(get("timestamp").value) : new Date();
-    const transactionType = get("transactionType")?.value || original?.transactionType || "Expense";
+    const transactionType = normalizeType(
+      get("transactionType")?.value || original?.transactionType || "Expense"
+    );
     const transfer = isTransferType(transactionType);
     const people = transfer
       ? []

@@ -5,6 +5,7 @@ import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
@@ -182,10 +183,12 @@ class LanApi(
         val notesRaw = if (body.has("notes")) body.optString("notes").trim() else existing?.notes
         val notes = notesRaw?.ifBlank { null }
         val timestamp = body.optLong("timestamp", existing?.timestamp ?: System.currentTimeMillis())
-        val transactionType = body.optString(
-            "transactionType",
-            existing?.transactionType ?: "Expense"
-        ).ifBlank { "Expense" }
+        val transactionType = MoneyManagerExporter.normalizeType(
+            body.optString(
+                "transactionType",
+                existing?.transactionType ?: "Expense"
+            )
+        )
         val isTransfer = transactionType == "Transfer-Out"
         val reviewStatus = body.optString(
             "reviewStatus",
@@ -371,7 +374,7 @@ class LanApi(
             .put("splitMode", tx.splitMode)
             .put("splitAllocations", tx.splitAllocations)
             .put("reviewStatus", tx.reviewStatus)
-            .put("transactionType", tx.transactionType)
+            .put("transactionType", MoneyManagerExporter.normalizeType(tx.transactionType))
             .put("splitwiseGroupId", tx.splitwiseGroupId)
             .put("splitwiseExpenseId", tx.splitwiseExpenseId)
             .put("splitwiseParticipantIds", tx.splitwiseParticipantIds)

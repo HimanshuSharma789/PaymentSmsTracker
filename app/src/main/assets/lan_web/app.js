@@ -253,8 +253,15 @@
     fillMemberChips([], {});
   }
 
+  function normalizeType(type) {
+    const key = String(type || "Expense").trim().toLowerCase().replace(/[\s_-]/g, "");
+    if (key === "income") return "Income";
+    if (key === "transferout" || key === "transfer") return "Transfer-Out";
+    return "Expense";
+  }
+
   function isTransferType(type) {
-    return (type || form.transactionType.value) === "Transfer-Out";
+    return normalizeType(type || form.transactionType.value) === "Transfer-Out";
   }
 
   function fillCategoryOptionsForType() {
@@ -377,7 +384,7 @@
         return false;
       }
       if (subcategory && (tx.subcategory || "") !== subcategory) return false;
-      if (type && (tx.transactionType || "Expense") !== type) return false;
+      if (type && normalizeType(tx.transactionType) !== type) return false;
       return true;
     });
   }
@@ -393,7 +400,7 @@
     listEmpty.hidden = filtered.length > 0;
     updateFilterCount(filtered.length, items.length);
     listEl.innerHTML = filtered.map((tx) => {
-      const type = tx.transactionType || "Expense";
+      const type = normalizeType(tx.transactionType);
       const metaLine = type === "Transfer-Out"
         ? `${tx.account || "?"} → ${tx.category || "?"}`
         : ([tx.account, tx.category].filter(Boolean).join(" · ") || "Uncategorized");
@@ -486,7 +493,7 @@
       form.amount.value = tx.amount;
       form.merchantName.value = tx.merchantName || "";
       form.account.value = tx.account || "";
-      form.transactionType.value = tx.transactionType || "Expense";
+      form.transactionType.value = normalizeType(tx.transactionType);
       restoreCategory = tx.category || "";
       restoreSubcategory = tx.subcategory || "";
       form.date.value = ymdHm(tx.timestamp);
@@ -530,7 +537,7 @@
       amount: Number(form.amount.value),
       merchantName,
       account: form.account.value,
-      transactionType: form.transactionType.value,
+      transactionType: normalizeType(form.transactionType.value),
       category: form.category.value,
       subcategory: transfer ? "" : form.subcategory.value,
       notes: form.notes.value.trim(),

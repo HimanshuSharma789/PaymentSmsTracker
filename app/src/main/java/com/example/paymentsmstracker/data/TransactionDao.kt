@@ -36,6 +36,25 @@ interface TransactionDao {
     fun getTransactionsForDay(dayStart: Long, dayEnd: Long): Flow<List<Transaction>>
 
     /**
+     * Splits screen: pending (MM-exported, not pushed, including failures)
+     * plus successful Splitwise pushes.
+     */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE participants IS NOT NULL
+          AND TRIM(participants) != ''
+          AND UPPER(TRIM(participants)) != 'ME'
+          AND (
+            (reviewStatus = 'exported' AND splitwiseExpenseId = 0)
+            OR splitwiseExpenseId > 0
+          )
+        ORDER BY timestamp DESC
+        """
+    )
+    fun getSplitsForTable(): Flow<List<Transaction>>
+
+    /**
      * Pending Splitwise queue: MM-exported shared expenses that are not pushed yet
      * (includes previous push failures).
      */

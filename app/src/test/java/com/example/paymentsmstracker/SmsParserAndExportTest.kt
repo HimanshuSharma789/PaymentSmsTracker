@@ -226,7 +226,7 @@ class SmsParserAndExportTest {
     }
 
     @Test
-    fun moneyManagerExportUsesDotDateFormat() {
+    fun moneyManagerExportUsesSlashDateFormat() {
         val tx = Transaction(
             amount = 10.0,
             merchantName = "Tea",
@@ -238,7 +238,8 @@ class SmsParserAndExportTest {
             transactionType = "Expense"
         )
         val rows = MoneyManagerExporter.expandTransaction(tx, AppConfig())
-        assertEquals("2026-12-30", rows.first().date)
+        assertEquals("12/30/2026", rows.first().date)
+        assertEquals("Expense", rows.first().incomeExpense)
     }
 
     @Test
@@ -263,7 +264,44 @@ class SmsParserAndExportTest {
         assertEquals("Transfer-Out", row.incomeExpense)
         assertEquals("2500.00", row.amount)
         assertEquals("Transfer to Cash", row.description)
-        assertEquals("2026-08-09", row.date)
+        assertEquals("08/09/2026", row.date)
+    }
+
+    @Test
+    fun moneyManagerTsvUsesTabSeparatedColumnsAndExpenseLabel() {
+        val tx = Transaction(
+            amount = 42.50,
+            merchantName = "Coffee Shop",
+            category = "Food",
+            subcategory = "Beverages",
+            account = "Cash",
+            timestamp = java.util.GregorianCalendar(2026, java.util.Calendar.NOVEMBER, 15).timeInMillis,
+            reviewStatus = "reviewed",
+            transactionType = "Expense"
+        )
+        val tsv = MoneyManagerExporter.toTsv(listOf(tx), AppConfig())
+        val lines = tsv.lines()
+        assertEquals(
+            "Date\tAccount\tCategory\tSubcategory\tNote\tAmount\tIncome/Expense\tDescription",
+            lines.first()
+        )
+        assertTrue(lines[1].contains("\t"))
+        assertTrue(lines[1].contains("Expense"))
+        assertTrue(lines[1].startsWith("11/15/2026"))
+    }
+
+    @Test
+    fun moneyManagerIncomeExpenseColumnOnlyAllowsOfficialTypes() {
+        assertEquals("Expense", MoneyManagerExporter.toMoneyManagerType("Expense"))
+        assertEquals("Expense", MoneyManagerExporter.toMoneyManagerType("Expenses"))
+        assertEquals("Expense", MoneyManagerExporter.toMoneyManagerType("unknown"))
+        assertEquals("Income", MoneyManagerExporter.toMoneyManagerType("Income"))
+        assertEquals("Transfer-Out", MoneyManagerExporter.toMoneyManagerType("Transfer-Out"))
+        assertEquals("Transfer-Out", MoneyManagerExporter.toMoneyManagerType("transfer"))
+        val allowed = setOf("Income", "Expense", "Transfer-Out")
+        listOf("Expense", "Income", "Transfer-Out", "", "Transfer-In", "Debit").forEach { type ->
+            assertTrue(MoneyManagerExporter.toMoneyManagerType(type) in allowed)
+        }
     }
 
     @Test
