@@ -15,12 +15,15 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.paymentsmstracker.agent.AgentProvider
+import com.example.paymentsmstracker.agent.AgentSettings
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerSync
 import com.example.paymentsmstracker.export.SplitwiseExporter
+import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.reminder.NightlyReviewScheduler
 import com.example.paymentsmstracker.server.LanAccessService
 import com.example.paymentsmstracker.server.LanServerState
@@ -44,6 +47,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +88,9 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var panelRules: View
     private lateinit var panelTest: View
     private lateinit var panelMaintenance: View
+    private lateinit var panelPermissions: View
+    private lateinit var panelAi: View
+    private lateinit var permissionsPanel: PermissionsPanel
     private lateinit var chipGroupThemeMode: ChipGroup
     private lateinit var textThemeModeHint: TextView
     private lateinit var chipGroupLanDuration: ChipGroup
@@ -168,6 +175,9 @@ class AdminActivity : AppCompatActivity() {
         panelRules = findViewById(R.id.panelRules)
         panelTest = findViewById(R.id.panelTest)
         panelMaintenance = findViewById(R.id.panelMaintenance)
+        panelPermissions = findViewById(R.id.panelPermissions)
+        panelAi = findViewById(R.id.panelAi)
+        permissionsPanel = PermissionsPanel(this, panelPermissions)
         chipGroupThemeMode = findViewById(R.id.chipGroupThemeMode)
         textThemeModeHint = findViewById(R.id.textThemeModeHint)
         chipGroupLanDuration = findViewById(R.id.chipGroupLanDuration)
@@ -234,6 +244,16 @@ class AdminActivity : AppCompatActivity() {
         }
         findViewById<MaterialButton>(R.id.buttonTestParse).setOnClickListener { runParseTest() }
         findViewById<MaterialButton>(R.id.buttonInjectSms).setOnClickListener { injectParsedSms() }
+        findViewById<MaterialButton>(R.id.buttonCreateSmsRule).setOnClickListener {
+            val sms = editTestSms.text?.toString().orEmpty()
+            startActivity(
+                Intent(this, SmsRuleWizardActivity::class.java).apply {
+                    if (sms.isNotBlank()) {
+                        putExtra(SmsRuleWizardActivity.EXTRA_SMS, sms)
+                    }
+                }
+            )
+        }
         findViewById<MaterialButton>(R.id.buttonExportAllRaw).setOnClickListener { exportRawCsv() }
         findViewById<MaterialButton>(R.id.buttonExportMoneyManager).setOnClickListener {
             exportMoneyManager(markExported = true)
@@ -258,10 +278,14 @@ class AdminActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.buttonClearExported).setOnClickListener {
             confirmClearStatus(ReviewStatus.EXPORTED, getString(R.string.clear_mm_exported))
         }
+        findViewById<MaterialButton>(R.id.buttonClearExportedOlder).setOnClickListener {
+            confirmClearExportedOlderThan30Days()
+        }
         findViewById<MaterialButton>(R.id.buttonClearAll).setOnClickListener {
             confirmClearAll()
         }
 
+        setupAiSettings()
         findViewById<MaterialButton>(R.id.buttonSplitwiseSaveCredentials).setOnClickListener {
             saveSplitwiseCredentials()
         }
@@ -280,6 +304,9 @@ class AdminActivity : AppCompatActivity() {
             }
             splitwiseStore.saveCredentials(key, secret)
             SplitwiseWebAuthActivity.start(this, oauthMode = true)
+        }
+        findViewById<MaterialButton>(R.id.buttonSplitwiseAdvancedToggle).setOnClickListener {
+            toggleSplitwiseAdvancedOAuth()
         }
         findViewById<MaterialButton>(R.id.buttonSplitwiseSignOut).setOnClickListener {
             splitwiseStore.signOut()
@@ -315,6 +342,8 @@ class AdminActivity : AppCompatActivity() {
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_rules))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_test))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_maintenance))
+        tabs.addTab(tabs.newTab().setText(R.string.admin_tab_permissions))
+        tabs.addTab(tabs.newTab().setText(R.string.admin_tab_ai))
         tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) = showPanel(tab.position)
             override fun onTabUnselected(tab: TabLayout.Tab) {}
@@ -331,6 +360,9 @@ class AdminActivity : AppCompatActivity() {
         panelRules.visibility = if (index == 4) View.VISIBLE else View.GONE
         panelTest.visibility = if (index == 5) View.VISIBLE else View.GONE
         panelMaintenance.visibility = if (index == 6) View.VISIBLE else View.GONE
+        panelPermissions.visibility = if (index == 7) View.VISIBLE else View.GONE
+        panelAi.visibility = if (index == 8) View.VISIBLE else View.GONE
+        if (index == 7) permissionsPanel.refresh()
         if (index == 3) {
             refreshLanStatusUi()
             lanUiHandler.removeCallbacks(lanUiTicker)
@@ -341,6 +373,69 @@ class AdminActivity : AppCompatActivity() {
             lanUiHandler.removeCallbacks(lanUiTicker)
         }
         if (index == 1) bindSplitwiseUi()
+    }
+
+    private var splitwiseAdvancedOAuthExpanded = false
+
+    private fun setupAiSettings() {
+        val settings = AgentSettings(this)
+        val chips = findViewById<ChipGroup>(R.id.chipGroupAiProvider)
+        val hint = findViewById<TextView>(R.id.textAiProviderHint)
+        val url = findViewById<TextInputEditText>(R.id.editAiBaseUrl)
+        val model = findViewById<TextInputEditText>(R.id.editAiModel)
+        val key = findViewById<TextInputEditText>(R.id.editAiApiKey)
+        val keyLayout = findViewById<TextInputLayout>(R.id.layoutAiApiKey)
+        var shown = settings.provider
+
+        fun load(p: AgentProvider) {
+            shown = p
+            url.setText(settings.baseUrl(p))
+            model.setText(settings.model(p))
+            key.setText(settings.apiKey(p))
+            keyLayout.error = null
+            hint.setText(
+                when (p) {
+                    AgentProvider.CLAUDE -> R.string.ai_provider_claude_hint
+                    AgentProvider.OPENROUTER -> R.string.ai_provider_openrouter_hint
+                    AgentProvider.OPENAI_COMPATIBLE -> R.string.ai_provider_openai_hint
+                }
+            )
+        }
+
+        fun saveShown(): Boolean {
+            val baseUrl = url.text?.toString().orEmpty().trim()
+            if (baseUrl.toHttpUrlOrNull() == null) {
+                url.error = getString(R.string.ai_invalid_url); return false
+            }
+            val apiKey = key.text?.toString().orEmpty()
+            if (shown.keyRequired && apiKey.isBlank()) {
+                keyLayout.error = getString(R.string.ai_key_required); return false
+            }
+            settings.save(shown, apiKey, model.text?.toString().orEmpty(), baseUrl)
+            settings.provider = shown
+            return true
+        }
+
+        for (i in 0 until chips.childCount) {
+            val chip = chips.getChildAt(i) as Chip
+            chip.isChecked = chip.tag == shown.name
+        }
+        load(shown)
+        chips.setOnCheckedStateChangeListener { group, ids ->
+            val tag = group.findViewById<Chip>(ids.firstOrNull() ?: return@setOnCheckedStateChangeListener).tag
+            load(AgentProvider.valueOf(tag.toString()))
+        }
+        findViewById<MaterialButton>(R.id.buttonAiSave).setOnClickListener {
+            if (saveShown()) Toast.makeText(this, R.string.ai_saved, Toast.LENGTH_SHORT).show()
+        }
+        findViewById<MaterialSwitch>(R.id.switchAiEnabled).apply {
+            isChecked = settings.enabled
+            setOnCheckedChangeListener { _, checked -> settings.enabled = checked }
+        }
+        findViewById<MaterialSwitch>(R.id.switchAiIncludeSms).apply {
+            isChecked = settings.includeSms
+            setOnCheckedChangeListener { _, checked -> settings.includeSms = checked }
+        }
     }
 
     private fun bindSplitwiseUi() {
@@ -370,6 +465,10 @@ class AdminActivity : AppCompatActivity() {
             SplitwiseAuthMethod.TOKEN -> getString(R.string.splitwise_auth_method_token)
             SplitwiseAuthMethod.NONE -> getString(R.string.splitwise_auth_method_none)
         }
+        if (auth.resolvedAuthMethod == SplitwiseAuthMethod.OAUTH) {
+            splitwiseAdvancedOAuthExpanded = true
+        }
+        applySplitwiseAdvancedOAuthVisibility()
         textSplitwiseGroups.text = getString(R.string.splitwise_groups_label, auth.groups.size)
         val defaultName = auth.groupById(auth.defaultGroupId)?.name
         buttonSplitwiseDefaultGroup.text = if (defaultName != null) {
@@ -377,6 +476,24 @@ class AdminActivity : AppCompatActivity() {
         } else {
             getString(R.string.splitwise_default_group)
         }
+    }
+
+    private fun toggleSplitwiseAdvancedOAuth() {
+        splitwiseAdvancedOAuthExpanded = !splitwiseAdvancedOAuthExpanded
+        applySplitwiseAdvancedOAuthVisibility()
+    }
+
+    private fun applySplitwiseAdvancedOAuthVisibility() {
+        val card = findViewById<View>(R.id.cardSplitwiseOAuthAuth)
+        val toggle = findViewById<MaterialButton>(R.id.buttonSplitwiseAdvancedToggle)
+        card.visibility = if (splitwiseAdvancedOAuthExpanded) View.VISIBLE else View.GONE
+        toggle.setText(
+            if (splitwiseAdvancedOAuthExpanded) {
+                R.string.splitwise_auth_advanced_hide
+            } else {
+                R.string.splitwise_auth_advanced
+            }
+        )
     }
 
     private fun connectSplitwiseWithApiKey() {
@@ -551,6 +668,7 @@ class AdminActivity : AppCompatActivity() {
             bindSplitwiseUi()
         }
         refreshLanStatusUi()
+        if (panelPermissions.visibility == View.VISIBLE) permissionsPanel.refresh()
         if (panelLaptop.visibility == View.VISIBLE && LanServerState.get().running) {
             lanUiHandler.removeCallbacks(lanUiTicker)
             lanUiHandler.post(lanUiTicker)
@@ -748,11 +866,22 @@ class AdminActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             val id = withContext(Dispatchers.IO) {
-                AppDatabase.getDatabase(applicationContext).transactionDao().insertTransaction(
+                val db = AppDatabase.getDatabase(applicationContext)
+                val hint = MerchantMemory.lookup(db, parsed.merchantName)
+                val filled = MerchantMemory.applyToBlankFields(
+                    category = "",
+                    subcategory = "",
+                    account = parsed.account,
+                    transactionType = parsed.transactionType,
+                    hint = hint
+                )
+                db.transactionDao().insertTransaction(
                     Transaction(
                         amount = parsed.amount,
                         merchantName = parsed.merchantName,
-                        account = parsed.account,
+                        category = filled.category,
+                        subcategory = filled.subcategory,
+                        account = filled.account,
                         timestamp = parsed.timestamp,
                         originalSms = sms,
                         isExpense = parsed.isExpense,
@@ -1009,10 +1138,21 @@ class AdminActivity : AppCompatActivity() {
                     continue
                 }
 
+                val db = AppDatabase.getDatabase(applicationContext)
+                val hint = MerchantMemory.lookup(db, parsed.merchantName)
+                val filled = MerchantMemory.applyToBlankFields(
+                    category = "",
+                    subcategory = "",
+                    account = parsed.account,
+                    transactionType = parsed.transactionType,
+                    hint = hint
+                )
                 val transaction = Transaction(
                     amount = parsed.amount,
                     merchantName = parsed.merchantName,
-                    account = parsed.account,
+                    category = filled.category,
+                    subcategory = filled.subcategory,
+                    account = filled.account,
                     timestamp = parsed.timestamp,
                     originalSms = body,
                     isExpense = parsed.isExpense,
@@ -1069,6 +1209,45 @@ class AdminActivity : AppCompatActivity() {
                         Toast.makeText(
                             this@AdminActivity,
                             "Deleted $deleted $label transactions",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                .show()
+        }
+    }
+
+    private fun confirmClearExportedOlderThan30Days() {
+        lifecycleScope.launch {
+            val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+            val count = withContext(Dispatchers.IO) {
+                AppDatabase.getDatabase(applicationContext)
+                    .transactionDao()
+                    .getTransactionsByStatusList(ReviewStatus.EXPORTED)
+                    .count { it.lastUpdatedTimestamp < cutoff }
+            }
+            if (count == 0) {
+                Toast.makeText(
+                    this@AdminActivity,
+                    R.string.clear_mm_exported_older_none,
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            AlertDialog.Builder(this@AdminActivity)
+                .setTitle(R.string.clear_mm_exported_older_title)
+                .setMessage(getString(R.string.clear_mm_exported_older_message, count))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.delete) { _, _ ->
+                    lifecycleScope.launch {
+                        val deleted = withContext(Dispatchers.IO) {
+                            AppDatabase.getDatabase(applicationContext)
+                                .transactionDao()
+                                .deleteExportedOlderThan(ReviewStatus.EXPORTED, cutoff)
+                        }
+                        Toast.makeText(
+                            this@AdminActivity,
+                            getString(R.string.clear_mm_exported_older_done, deleted),
                             Toast.LENGTH_LONG
                         ).show()
                     }

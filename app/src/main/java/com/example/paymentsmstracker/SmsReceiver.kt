@@ -18,6 +18,8 @@ import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.location.LocationCapture
+import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.sms.ParsedSms
 import com.example.paymentsmstracker.sms.SmsDedupe
 import com.example.paymentsmstracker.sms.SmsParser
@@ -78,12 +80,23 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val transaction = Transaction(
-            amount = parsed.amount,
-            merchantName = parsed.merchantName,
+        val db = AppDatabase.getDatabase(context)
+        val hint = MerchantMemory.lookup(db, parsed.merchantName)
+        val filled = MerchantMemory.applyToBlankFields(
             category = "",
             subcategory = "",
             account = parsed.account,
+            transactionType = parsed.transactionType,
+            hint = hint
+        )
+
+        val location = LocationCapture.current(context)
+        val transaction = Transaction(
+            amount = parsed.amount,
+            merchantName = parsed.merchantName,
+            category = filled.category,
+            subcategory = filled.subcategory,
+            account = filled.account,
             notes = null,
             timestamp = parsed.timestamp,
             originalSms = messageBody,
@@ -91,7 +104,9 @@ class SmsReceiver : BroadcastReceiver() {
             referenceNumber = parsed.referenceNumber,
             participants = "",
             reviewStatus = ReviewStatus.NEEDS_REVIEW,
-            transactionType = parsed.transactionType
+            transactionType = parsed.transactionType,
+            latitude = location?.latitude,
+            longitude = location?.longitude
         )
 
         val id = if (config.autoSaveFromSms) {
@@ -100,14 +115,16 @@ class SmsReceiver : BroadcastReceiver() {
             0L
         }
 
-        showNotification(context, parsed, messageBody, id)
+        showNotification(context, transaction, parsed, messageBody, id, filled.account)
     }
 
     private fun showNotification(
         context: Context,
+        transaction: Transaction,
         parsed: ParsedSms,
         originalMessage: String,
-        transactionId: Long
+        transactionId: Long,
+        accountForIntent: String
     ) {
         val intent = Intent(context, TransactionEntryActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -118,8 +135,10 @@ class SmsReceiver : BroadcastReceiver() {
                 putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_MERCHANT, parsed.merchantName)
                 putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_DATE, parsed.timestamp)
                 putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_REFERENCE, parsed.referenceNumber)
-                putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_ACCOUNT, parsed.account)
+                putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_ACCOUNT, accountForIntent)
                 putExtra(TransactionEntryActivity.EXTRA_ORIGINAL_SMS, originalMessage)
+                transaction.latitude?.let { putExtra(TransactionEntryActivity.EXTRA_LATITUDE, it) }
+                transaction.longitude?.let { putExtra(TransactionEntryActivity.EXTRA_LONGITUDE, it) }
             }
         }
         val pendingIntentFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

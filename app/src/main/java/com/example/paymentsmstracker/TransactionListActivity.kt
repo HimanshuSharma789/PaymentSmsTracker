@@ -20,6 +20,7 @@ import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.export.MoneyManagerSync
+import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.example.paymentsmstracker.viewmodel.TransactionListViewModel
 import com.google.android.material.appbar.MaterialToolbar
@@ -28,7 +29,6 @@ import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 
 class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListener {
 
@@ -74,11 +74,6 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
         )
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
-            db.transactionDao().deleteExportedOlderThan(ReviewStatus.EXPORTED, cutoff)
-        }
-
         if (intent.getStringExtra(EXTRA_FILTER) == "SPLITS") {
             startActivity(Intent(this, SplitsActivity::class.java))
             finish()
@@ -107,13 +102,16 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        val filter = transactionListViewModel.currentFilter()
         if (selectionModeActive) {
-            val filter = transactionListViewModel.currentFilter()
             menu.findItem(R.id.action_mark_reviewed_selected)?.isVisible =
                 filter == ListFilter.NEEDS_REVIEW
             menu.findItem(R.id.action_export_selected)?.isVisible =
                 filter == ListFilter.REVIEWED
             menu.findItem(R.id.action_delete_selected)?.isVisible = true
+        } else {
+            menu.findItem(R.id.action_export_reviewed)?.isVisible =
+                filter == ListFilter.REVIEWED && lastListCount > 0
         }
         return super.onPrepareOptionsMenu(menu)
     }
@@ -122,6 +120,10 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         return when (item.itemId) {
             R.id.action_open_splits -> {
                 startActivity(Intent(this, SplitsActivity::class.java))
+                true
+            }
+            R.id.action_export_reviewed -> {
+                confirmExportAllReviewed()
                 true
             }
             R.id.action_select_transactions -> {
@@ -168,6 +170,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             transactionListViewModel.setFilter(filter)
             transactionAdapter.setListFilter(filter)
+            invalidateOptionsMenu()
             if (selectionModeActive) {
                 exitSelectionMode()
             }
@@ -199,6 +202,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                     else -> getString(R.string.no_transactions_yet)
                 }
                 updateListSubtitle(0, filter)
+                invalidateOptionsMenu()
                 if (selectionModeActive) {
                     exitSelectionMode()
                 }
@@ -207,6 +211,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 emptyStateTextView.visibility = View.GONE
                 transactionAdapter.submitList(transactions)
                 updateListSubtitle(transactions.size, filter)
+                invalidateOptionsMenu()
             }
         }
     }
@@ -296,6 +301,21 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             .show()
     }
 
+    private fun confirmExportAllReviewed() {
+        if (lastListCount <= 0) {
+            Toast.makeText(this, R.string.no_reviewed_to_export, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.export_all_reviewed_title)
+            .setMessage(getString(R.string.export_all_reviewed_message, lastListCount))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.export_selected) { _, _ ->
+                exportAllReviewedToMoneyManager()
+            }
+            .show()
+    }
+
     private fun deleteSelected(ids: Set<Long>) {
         lifecycleScope.launch {
             val deleted = withContext(Dispatchers.IO) {
@@ -313,11 +333,25 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     private fun markSelectedReviewed(ids: Set<Long>) {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
-                db.transactionDao().updateStatusForIds(
+                val dao = db.transactionDao()
+                dao.updateStatusForIds(
                     ids.toList(),
                     ReviewStatus.REVIEWED,
                     System.currentTimeMillis()
                 )
+                ids.forEach { id ->
+                    val tx = dao.getTransactionById(id) ?: return@forEach
+                    if (tx.category.isNotBlank()) {
+                        MerchantMemory.remember(
+                            db = db,
+                            merchant = tx.merchantName,
+                            category = tx.category,
+                            subcategory = tx.subcategory,
+                            account = tx.account,
+                            transactionType = tx.transactionType
+                        )
+                    }
+                }
             }
             Toast.makeText(
                 this@TransactionListActivity,
@@ -352,6 +386,33 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             )
             if (outcome != null) {
                 exitSelectionMode()
+                findViewById<Chip>(R.id.chipMmExported).isChecked = true
+            }
+        }
+    }
+
+    private fun exportAllReviewedToMoneyManager() {
+        lifecycleScope.launch {
+            val config = ConfigStore(this@TransactionListActivity).load()
+            val txs = withContext(Dispatchers.IO) {
+                db.transactionDao().getTransactionsByStatusList(ReviewStatus.REVIEWED)
+            }
+            if (txs.isEmpty()) {
+                Toast.makeText(
+                    this@TransactionListActivity,
+                    R.string.no_reviewed_to_export,
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            val outcome = MoneyManagerSync.syncToMoneyManager(
+                activity = this@TransactionListActivity,
+                transactions = txs,
+                config = config,
+                transactionDao = db.transactionDao(),
+                markExported = true
+            )
+            if (outcome != null) {
                 findViewById<Chip>(R.id.chipMmExported).isChecked = true
             }
         }

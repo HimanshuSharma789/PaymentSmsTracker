@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Opt-in from Settings → Permissions: tags SMS transactions with where they arrived. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -87,6 +91,9 @@
             android:name=".AdminActivity"
             android:exported="false"
             android:launchMode="singleTop" />
+        <activity
+            android:name=".SmsRuleWizardActivity"
+            android:exported="false" />
 
         <activity
             android:name=".splitwise.SplitwiseWebAuthActivity"

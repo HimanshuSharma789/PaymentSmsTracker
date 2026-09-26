@@ -5,7 +5,11 @@
         android:id="@+id/action_push_selected_splits"
         android:icon="@drawable/outline_task_alt_24"
         android:title="@string/splitwise_push_selected"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_mark_selected_success"
+        android:title="@string/splitwise_mark_selected_success"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_select_all_splits"
         android:title="@string/select_all"

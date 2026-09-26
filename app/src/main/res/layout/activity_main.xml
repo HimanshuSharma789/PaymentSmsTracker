@@ -29,43 +29,146 @@
             android:orientation="vertical"
             android:padding="24dp">
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/card_main_actions"
-                style="?attr/materialCardViewFilledStyle"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/home_whats_left"
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+            <TextView
+                android:id="@+id/textHomeSummary"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                tools:text="3 to review · 2 ready for Money Manager · 1 split pending" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="?attr/materialCardViewOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:paddingVertical="4dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:text="@string/quick_start"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/button_go_to_transaction"
-                        style="@style/Widget.Material3.Button.Icon"
+                    <LinearLayout
+                        android:id="@+id/rowHomeReview"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/add_new_transaction"
-                        app:icon="@drawable/outline_attach_money_24" />
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <TextView
+                            android:id="@+id/textHomeReviewCount"
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                            android:textStyle="bold"
+                            tools:text="3" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/home_to_review"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    </LinearLayout>
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp" />
+
+                    <LinearLayout
+                        android:id="@+id/rowHomeReadyMm"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <TextView
+                            android:id="@+id/textHomeReadyCount"
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                            android:textStyle="bold"
+                            tools:text="2" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/home_ready_for_mm"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    </LinearLayout>
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp" />
+
+                    <LinearLayout
+                        android:id="@+id/rowHomeSplits"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <TextView
+                            android:id="@+id/textHomeSplitsCount"
+                            android:layout_width="48dp"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                            android:textStyle="bold"
+                            tools:text="1" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/home_splits_pending"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_review_today"
+                android:id="@+id/buttonHomePrimary"
+                style="@style/Widget.Material3.Button.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/home_cta_review"
+                app:icon="@drawable/baseline_history_24" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_go_to_transaction"
                 style="@style/Widget.Material3.Button.TonalButton.Icon"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/review_needs_attention"
-                app:icon="@drawable/baseline_history_24" />
+                android:layout_marginTop="12dp"
+                android:text="@string/add_new_transaction"
+                app:icon="@drawable/outline_attach_money_24" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_view_all_transactions"
@@ -75,51 +178,6 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/view_all_transactions"
                 app:icon="@drawable/baseline_history_24" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_view_exported"
-                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/exported_transactions"
-                app:icon="@drawable/outline_task_alt_24" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_open_splits"
-                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/splits_table"
-                app:icon="@drawable/outline_checklist_24" />
-
-            <TextView
-                android:id="@+id/textView_setup_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="8dp"
-                android:text="@string/setup_permissions"
-                android:textAppearance="?attr/textAppearanceTitleSmall"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_enable_sms_feature"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/enable_sms_permissions"
-                app:icon="@drawable/baseline_sms_24" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/your_button_to_enable_notifications"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/enable_notifications"
-                app:icon="@drawable/outline_circle_notifications_24" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

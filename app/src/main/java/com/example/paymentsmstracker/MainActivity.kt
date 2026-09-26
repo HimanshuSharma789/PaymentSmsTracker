@@ -1,52 +1,49 @@
 package com.example.paymentsmstracker
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Button
-import android.widget.Toast
+import android.view.View
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.example.paymentsmstracker.data.AppDatabase
+import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                Toast.makeText(this, "Notification permission granted!", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(
-                    this,
-                    "Notification permission denied. Some features might not work.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
+    private enum class HomePrimaryAction {
+        REVIEW,
+        EXPORT_MM,
+        SPLITS,
+        ADD
+    }
 
-    private val requestSmsPermissionsLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val receiveSmsGranted = permissions[Manifest.permission.RECEIVE_SMS] == true
-            if (receiveSmsGranted) {
-                Toast.makeText(this, "SMS reading permission granted!", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(
-                    this,
-                    "SMS reading permission denied. Transaction tracking from SMS will not work.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                askForNotificationPermission()
-            }
-        }
+    private lateinit var textHomeSummary: TextView
+    private lateinit var textHomeReviewCount: TextView
+    private lateinit var textHomeReadyCount: TextView
+    private lateinit var textHomeSplitsCount: TextView
+    private lateinit var buttonHomePrimary: MaterialButton
+
+    private var primaryAction = HomePrimaryAction.ADD
+    private var needsReviewCount = 0
+    private var readyForMmCount = 0
+    private var pendingSplitsCount = 0
+
+    /** Core permissions (SMS + notifications) are asked once on a clean install; after that only from Settings → Permissions. */
+    private val startupPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,39 +52,122 @@ class MainActivity : AppCompatActivity() {
         val toolbar: MaterialToolbar = findViewById(R.id.toolbarHome)
         setSupportActionBar(toolbar)
 
-        findViewById<Button>(R.id.your_button_to_enable_notifications)?.setOnClickListener {
-            askForNotificationPermission()
+        textHomeSummary = findViewById(R.id.textHomeSummary)
+        textHomeReviewCount = findViewById(R.id.textHomeReviewCount)
+        textHomeReadyCount = findViewById(R.id.textHomeReadyCount)
+        textHomeSplitsCount = findViewById(R.id.textHomeSplitsCount)
+        buttonHomePrimary = findViewById(R.id.buttonHomePrimary)
+
+        findViewById<View>(R.id.rowHomeReview).setOnClickListener {
+            openTransactionList(ListFilter.NEEDS_REVIEW)
         }
-        findViewById<Button>(R.id.button_go_to_transaction)?.setOnClickListener {
-            startActivity(Intent(this, TransactionEntryActivity::class.java))
+        findViewById<View>(R.id.rowHomeReadyMm).setOnClickListener {
+            openTransactionList(ListFilter.REVIEWED)
         }
-        findViewById<Button>(R.id.button_review_today)?.setOnClickListener {
-            startActivity(
-                Intent(this, TransactionListActivity::class.java).apply {
-                    putExtra(TransactionListActivity.EXTRA_FILTER, ListFilter.NEEDS_REVIEW.name)
-                }
-            )
-        }
-        findViewById<Button>(R.id.button_view_all_transactions)?.setOnClickListener {
-            startActivity(
-                Intent(this, TransactionListActivity::class.java).apply {
-                    putExtra(TransactionListActivity.EXTRA_FILTER, ListFilter.ALL.name)
-                }
-            )
-        }
-        findViewById<Button>(R.id.button_view_exported)?.setOnClickListener {
-            startActivity(
-                Intent(this, TransactionListActivity::class.java).apply {
-                    putExtra(TransactionListActivity.EXTRA_FILTER, ListFilter.MM_EXPORTED.name)
-                }
-            )
-        }
-        findViewById<Button>(R.id.button_open_splits)?.setOnClickListener {
+        findViewById<View>(R.id.rowHomeSplits).setOnClickListener {
             startActivity(Intent(this, SplitsActivity::class.java))
         }
-        findViewById<Button>(R.id.button_enable_sms_feature)?.setOnClickListener {
-            checkAndRequestSmsPermissions()
+        buttonHomePrimary.setOnClickListener { runPrimaryAction() }
+        findViewById<MaterialButton>(R.id.button_go_to_transaction).setOnClickListener {
+            startActivity(Intent(this, TransactionEntryActivity::class.java))
         }
+        findViewById<MaterialButton>(R.id.button_view_all_transactions).setOnClickListener {
+            openTransactionList(ListFilter.ALL)
+        }
+
+        observeHomeCounts()
+        askStartupPermissionsOnce()
+    }
+
+    private fun askStartupPermissionsOnce() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_STARTUP_PERMISSIONS_ASKED, false)) return
+        prefs.edit().putBoolean(KEY_STARTUP_PERMISSIONS_ASKED, true).apply()
+        val missing = PermissionsPanel.corePermissions().filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) startupPermissionsLauncher.launch(missing.toTypedArray())
+    }
+
+    private fun observeHomeCounts() {
+        val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                combine(
+                    dao.countByStatus(ReviewStatus.NEEDS_REVIEW),
+                    dao.countByStatus(ReviewStatus.REVIEWED),
+                    dao.countPendingSplits()
+                ) { review, ready, splits ->
+                    Triple(review, ready, splits)
+                }.collect { (review, ready, splits) ->
+                    needsReviewCount = review
+                    readyForMmCount = ready
+                    pendingSplitsCount = splits
+                    renderHomeCounts()
+                }
+            }
+        }
+    }
+
+    private fun renderHomeCounts() {
+        textHomeReviewCount.text = needsReviewCount.toString()
+        textHomeReadyCount.text = readyForMmCount.toString()
+        textHomeSplitsCount.text = pendingSplitsCount.toString()
+
+        val totalLeft = needsReviewCount + readyForMmCount + pendingSplitsCount
+        textHomeSummary.text = if (totalLeft == 0) {
+            getString(R.string.home_summary_caught_up)
+        } else {
+            getString(
+                R.string.home_summary,
+                needsReviewCount,
+                readyForMmCount,
+                pendingSplitsCount
+            )
+        }
+
+        primaryAction = when {
+            needsReviewCount > 0 -> HomePrimaryAction.REVIEW
+            readyForMmCount > 0 -> HomePrimaryAction.EXPORT_MM
+            pendingSplitsCount > 0 -> HomePrimaryAction.SPLITS
+            else -> HomePrimaryAction.ADD
+        }
+        when (primaryAction) {
+            HomePrimaryAction.REVIEW -> {
+                buttonHomePrimary.setText(R.string.home_cta_review)
+                buttonHomePrimary.setIconResource(R.drawable.baseline_history_24)
+            }
+            HomePrimaryAction.EXPORT_MM -> {
+                buttonHomePrimary.setText(R.string.home_cta_export)
+                buttonHomePrimary.setIconResource(R.drawable.outline_task_alt_24)
+            }
+            HomePrimaryAction.SPLITS -> {
+                buttonHomePrimary.setText(R.string.home_cta_splits)
+                buttonHomePrimary.setIconResource(R.drawable.outline_checklist_24)
+            }
+            HomePrimaryAction.ADD -> {
+                buttonHomePrimary.setText(R.string.home_cta_caught_up)
+                buttonHomePrimary.setIconResource(R.drawable.outline_attach_money_24)
+            }
+        }
+    }
+
+    private fun runPrimaryAction() {
+        when (primaryAction) {
+            HomePrimaryAction.REVIEW -> openTransactionList(ListFilter.NEEDS_REVIEW)
+            HomePrimaryAction.EXPORT_MM -> openTransactionList(ListFilter.REVIEWED)
+            HomePrimaryAction.SPLITS -> startActivity(Intent(this, SplitsActivity::class.java))
+            HomePrimaryAction.ADD ->
+                startActivity(Intent(this, TransactionEntryActivity::class.java))
+        }
+    }
+
+    private fun openTransactionList(filter: ListFilter) {
+        startActivity(
+            Intent(this, TransactionListActivity::class.java).apply {
+                putExtra(TransactionListActivity.EXTRA_FILTER, filter.name)
+            }
+        )
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -105,61 +185,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestSmsPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECEIVE_SMS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.RECEIVE_SMS)
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            var showRationale = false
-            for (permission in permissionsToRequest) {
-                if (shouldShowRequestPermissionRationale(permission)) {
-                    showRationale = true
-                    break
-                }
-            }
-            if (showRationale) {
-                Log.i("MainActivity", "Showing rationale for SMS permissions.")
-                Toast.makeText(
-                    this,
-                    "This app needs SMS permission to automatically track transactions from messages.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            requestSmsPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
-        } else {
-            Toast.makeText(this, "SMS permissions already granted.", Toast.LENGTH_SHORT).show()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                askForNotificationPermission()
-            }
-        }
-    }
-
-    private fun askForNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            when {
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED -> {
-                    Toast.makeText(
-                        this,
-                        "Notification permissions already granted.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                else -> {
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-        }
+    companion object {
+        private const val PREFS_NAME = "main_activity"
+        private const val KEY_STARTUP_PERMISSIONS_ASKED = "startup_permissions_asked"
     }
 }

@@ -2,6 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_export_reviewed"
+        android:icon="@drawable/outline_task_alt_24"
+        android:title="@string/menu_export_mm"
+        android:visible="false"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/action_select_transactions"
         android:icon="@drawable/outline_check_box_24"
         android:title="@string/select_to_delete"

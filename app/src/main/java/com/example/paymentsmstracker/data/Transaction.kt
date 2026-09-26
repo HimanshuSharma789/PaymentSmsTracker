@@ -13,6 +13,19 @@ object ReviewStatus {
         status == REVIEWED || status == EXPORTED
 }
 
+/** Values stored in [Transaction.splitwiseExpenseId]. */
+object SplitwiseExpenseIds {
+    const val PENDING = 0L
+    /** User updated Splitwise themselves; treat as Success without an API expense id. */
+    const val MANUAL_SUCCESS = -1L
+
+    fun isDone(expenseId: Long): Boolean = expenseId != PENDING
+
+    fun isApiPush(expenseId: Long): Boolean = expenseId > 0L
+
+    fun isManualSuccess(expenseId: Long): Boolean = expenseId == MANUAL_SUCCESS
+}
+
 @Entity(tableName = "transactions")
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
@@ -44,7 +57,12 @@ data class Transaction(
     val transactionType: String = "Expense",
     /** Splitwise group to push into; 0 = none selected */
     val splitwiseGroupId: Long = 0L,
-    /** Splitwise expense id after a successful API push; 0 = not pushed */
+    /**
+     * Splitwise expense id after a successful API push.
+     * 0 = not done yet (pending).
+     * >0 = real Splitwise expense id.
+     * [SplitwiseExpenseIds.MANUAL_SUCCESS] = marked done without API push.
+     */
     val splitwiseExpenseId: Long = 0L,
     /**
      * Participant label → Splitwise user id, e.g. "ME=111,Puneet S=222".
@@ -53,6 +71,9 @@ data class Transaction(
     val splitwiseParticipantIds: String = "",
     /** Last Splitwise push failure message; blank when pending or pushed OK. */
     val splitwisePushError: String = "",
+    /** Where the phone was when the SMS arrived; null when location was off or unavailable. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val lastUpdatedTimestamp: Long = System.currentTimeMillis()
 ) {
     fun participantList(): List<String> =

@@ -1,5 +1,6 @@
 package com.example.paymentsmstracker.splitwise
 
+import com.example.paymentsmstracker.data.SplitwiseExpenseIds
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.split.SplitCalculator
@@ -29,11 +30,15 @@ object SplitwisePusher {
         if (!com.example.paymentsmstracker.data.ReviewStatus.canPushToSplitwise(tx.reviewStatus)) {
             return SplitwisePushResult(tx.id, error = "Mark as reviewed before pushing to Splitwise")
         }
-        if (tx.splitwiseExpenseId > 0L) {
+        if (SplitwiseExpenseIds.isDone(tx.splitwiseExpenseId)) {
             return SplitwisePushResult(
                 tx.id,
-                expenseId = tx.splitwiseExpenseId,
-                error = "Already pushed (expense #${tx.splitwiseExpenseId})"
+                expenseId = tx.splitwiseExpenseId.takeIf { SplitwiseExpenseIds.isApiPush(it) },
+                error = if (SplitwiseExpenseIds.isManualSuccess(tx.splitwiseExpenseId)) {
+                    "Already marked as success"
+                } else {
+                    "Already pushed (expense #${tx.splitwiseExpenseId})"
+                }
             )
         }
         val groupId = tx.splitwiseGroupId

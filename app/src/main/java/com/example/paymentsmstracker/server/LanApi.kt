@@ -303,6 +303,8 @@ class LanApi(
                 existing = existing
             ),
             splitwisePushError = existing?.splitwisePushError.orEmpty(),
+            latitude = existing?.latitude,
+            longitude = existing?.longitude,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
         return Parsed(transaction = tx)

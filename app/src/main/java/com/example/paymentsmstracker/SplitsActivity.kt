@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.paymentsmstracker.adapter.SplitRowUi
 import com.example.paymentsmstracker.adapter.SplitTableAdapter
 import com.example.paymentsmstracker.data.AppDatabase
+import com.example.paymentsmstracker.data.SplitwiseExpenseIds
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.splitwise.SplitwiseApi
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
@@ -41,6 +42,7 @@ class SplitsActivity : AppCompatActivity() {
     private lateinit var empty: TextView
     private lateinit var summary: TextView
     private lateinit var pushButton: MaterialButton
+    private lateinit var markSuccessButton: MaterialButton
     private lateinit var exportButton: MaterialButton
     private var selectionModeActive = false
     private var lastCount = 0
@@ -62,6 +64,7 @@ class SplitsActivity : AppCompatActivity() {
         empty = findViewById(R.id.textSplitsEmpty)
         summary = findViewById(R.id.textSplitsSummary)
         pushButton = findViewById(R.id.buttonPushSplitwiseFromSplits)
+        markSuccessButton = findViewById(R.id.buttonMarkSuccessFromSplits)
         exportButton = findViewById(R.id.buttonExportSplitwiseFromSplits)
         val recycler: RecyclerView = findViewById(R.id.recyclerSplitsTable)
         adapter = SplitTableAdapter(
@@ -86,6 +89,13 @@ class SplitsActivity : AppCompatActivity() {
         pushButton.setOnClickListener {
             if (selectionModeActive) {
                 confirmPushSelected()
+            } else {
+                startSelectionMode()
+            }
+        }
+        markSuccessButton.setOnClickListener {
+            if (selectionModeActive) {
+                confirmMarkSelectedSuccess()
             } else {
                 startSelectionMode()
             }
@@ -163,6 +173,7 @@ class SplitsActivity : AppCompatActivity() {
         val showPushActions = isPendingTab()
         adapter.setAllowSelection(showPushActions)
         pushButton.visibility = if (showPushActions) View.VISIBLE else View.GONE
+        markSuccessButton.visibility = if (showPushActions) View.VISIBLE else View.GONE
         exportButton.visibility = if (showPushActions) View.VISIBLE else View.GONE
         if (!selectionModeActive) {
             supportActionBar?.title = getString(R.string.splits_title)
@@ -171,6 +182,8 @@ class SplitsActivity : AppCompatActivity() {
             } else {
                 getString(R.string.list_count_items, rows.size)
             }
+            pushButton.setText(R.string.splitwise_select_and_push)
+            markSuccessButton.setText(R.string.splitwise_mark_success)
         }
         if (selectionModeActive && (rows.isEmpty() || !isPendingTab())) {
             exitSelectionMode()
@@ -207,6 +220,10 @@ class SplitsActivity : AppCompatActivity() {
                 confirmPushSelected()
                 true
             }
+            R.id.action_mark_selected_success -> {
+                confirmMarkSelectedSuccess()
+                true
+            }
             R.id.action_cancel_split_selection -> {
                 exitSelectionMode()
                 true
@@ -231,6 +248,7 @@ class SplitsActivity : AppCompatActivity() {
         selectionModeActive = true
         adapter.enterSelectionMode()
         pushButton.setText(R.string.splitwise_push_selected)
+        markSuccessButton.setText(R.string.splitwise_mark_selected_success)
         invalidateOptionsMenu()
         refreshSelectionTitle(0)
     }
@@ -240,6 +258,7 @@ class SplitsActivity : AppCompatActivity() {
         selectionModeActive = false
         adapter.exitSelectionMode()
         pushButton.setText(R.string.splitwise_select_and_push)
+        markSuccessButton.setText(R.string.splitwise_mark_success)
         supportActionBar?.title = getString(R.string.splits_title)
         supportActionBar?.subtitle =
             if (lastCount > 0) getString(R.string.list_count_items, lastCount) else null
@@ -271,6 +290,26 @@ class SplitsActivity : AppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.splitwise_push_selected) { _, _ ->
                 pushSelected(ids)
+            }
+            .show()
+    }
+
+    private fun confirmMarkSelectedSuccess() {
+        if (!isPendingTab()) {
+            Toast.makeText(this, R.string.splits_already_pushed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val ids = adapter.selectedIds()
+        if (ids.isEmpty()) {
+            Toast.makeText(this, R.string.no_transactions_selected, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.splitwise_mark_success_title)
+            .setMessage(getString(R.string.splitwise_mark_success_message, ids.size))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.splitwise_mark_selected_success) { _, _ ->
+                markSelectedSuccess(ids)
             }
             .show()
     }
@@ -353,6 +392,36 @@ class SplitsActivity : AppCompatActivity() {
                 Toast.makeText(this@SplitsActivity, message, Toast.LENGTH_LONG).show()
                 exitSelectionMode()
             }
+        }
+    }
+
+    private fun markSelectedSuccess(ids: Set<Long>) {
+        markSuccessButton.isEnabled = false
+        pushButton.isEnabled = false
+        lifecycleScope.launch {
+            val marked = withContext(Dispatchers.IO) {
+                val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
+                val txs = dao.getPendingSplitTransactionsList().filter { it.id in ids }
+                val now = System.currentTimeMillis()
+                txs.forEach { tx ->
+                    dao.updateTransaction(
+                        tx.copy(
+                            splitwiseExpenseId = SplitwiseExpenseIds.MANUAL_SUCCESS,
+                            splitwisePushError = "",
+                            lastUpdatedTimestamp = now
+                        )
+                    )
+                }
+                txs.size
+            }
+            markSuccessButton.isEnabled = true
+            pushButton.isEnabled = true
+            Toast.makeText(
+                this@SplitsActivity,
+                getString(R.string.splitwise_mark_success_done, marked),
+                Toast.LENGTH_LONG
+            ).show()
+            exitSelectionMode()
         }
     }
 

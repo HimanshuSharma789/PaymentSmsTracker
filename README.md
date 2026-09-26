@@ -2,12 +2,20 @@
 
 Local Android app that captures bank/UPI payment SMS, lets you review/split them end of day, and exports Money Manager (Realbyte) TSV — no cloud, data stays on your phone.
 
+## Project memory (humans and agents)
+
+Longer write-ups live in [`docs/`](docs/INDEX.md): problem, user flow, data flow, architecture.
+
+- Start: [docs/INDEX.md](docs/INDEX.md)
+- Agents: [AGENTS.md](AGENTS.md)
+
 ## Daily flow
 
 1. SMS arrives → auto-parsed and saved as **Needs review**
-2. Open **Review (Needs Attention)** → set account, category, split friends if needed → **Save as Reviewed**
-3. Tap **Export Reviewed → Money Manager TSV** → file in Downloads
+2. Home shows counts → **Review spends** → set account, category, split if needed → **Save as Reviewed**
+3. Home → **Export to Money Manager** (Reviewed list) → file in Downloads
 4. Import that `.tsv` in Money Manager
+5. Shared expenses appear under **Splits → Pending** until you push to Splitwise
 
 ## Admin (non-daily)
 
@@ -16,7 +24,8 @@ Home → **Admin**:
 - Accounts / participants / debt category
 - SMS dedupe window + auto-save toggle
 - Full config JSON (edit regex rules with named groups: `amount`, `merchant`, `date`, `reference`)
-- Test paste-SMS parser
+- Test paste-SMS parser + **Create rule from this SMS** wizard
+- Merchant memory learns category/account when you save a reviewed (or categorized) transaction
 - Export raw CSV / Money Manager TSV / clear all / reset defaults
 
 ## Built-in SMS samples covered

@@ -27,7 +27,7 @@ object SplitwiseExporter {
         if (people.isEmpty()) people.add("ME")
 
         val headers = mutableListOf(
-            "Date", "Description", "Category", "Cost", "Currency", "Paid by"
+            "Date", "Description", "Category", "Notes", "Cost", "Currency", "Paid by"
         ) + people.toList()
 
         val sb = StringBuilder()
@@ -49,6 +49,7 @@ object SplitwiseExporter {
                 dateFmt.format(Date(tx.timestamp)),
                 tx.merchantName,
                 listOf(tx.category, tx.subcategory).filter { it.isNotBlank() }.joinToString(" / "),
+                tx.notes.orEmpty(),
                 total.toPlainString(),
                 "INR",
                 "ME"

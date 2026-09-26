@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paymentsmstracker.R
+import com.example.paymentsmstracker.data.SplitwiseExpenseIds
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
@@ -31,6 +32,7 @@ data class SplitRowUi(
     val friendsOwe: String,
     val people: String,
     val pushed: Boolean,
+    val manualSuccess: Boolean,
     val error: String,
     val failed: Boolean
 )
@@ -121,6 +123,11 @@ class SplitTableAdapter(
                 statusLabel = R.string.split_status_failed
                 statusBackground = R.color.split_status_failed_bg
                 statusForeground = R.color.split_status_failed_fg
+            }
+            row.manualSuccess -> {
+                statusLabel = R.string.split_status_marked_done
+                statusBackground = R.color.split_status_pushed_bg
+                statusForeground = R.color.split_status_pushed_fg
             }
             row.pushed -> {
                 statusLabel = R.string.split_status_pushed
@@ -215,9 +222,10 @@ class SplitTableAdapter(
                 myShare = myShare.toPlainString(),
                 friendsOwe = friends.toPlainString(),
                 people = peopleLabel,
-                pushed = tx.splitwiseExpenseId > 0L,
+                pushed = SplitwiseExpenseIds.isDone(tx.splitwiseExpenseId),
+                manualSuccess = SplitwiseExpenseIds.isManualSuccess(tx.splitwiseExpenseId),
                 error = tx.splitwisePushError,
-                failed = failed
+                failed = failed && !SplitwiseExpenseIds.isDone(tx.splitwiseExpenseId)
             )
         }
     }
