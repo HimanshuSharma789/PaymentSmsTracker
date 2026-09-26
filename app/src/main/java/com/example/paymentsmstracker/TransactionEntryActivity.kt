@@ -2,12 +2,17 @@ package com.example.paymentsmstracker
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -19,12 +24,19 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.paymentsmstracker.agent.AgentRequest
+import com.example.paymentsmstracker.agent.AgentSettings
+import com.example.paymentsmstracker.agent.FormState
+import com.example.paymentsmstracker.agent.Suggestion
+import com.example.paymentsmstracker.agent.validate
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
+import com.example.paymentsmstracker.data.SplitwiseExpenseIds
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
+import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
 import com.example.paymentsmstracker.splitwise.SplitwiseApi
@@ -54,6 +66,8 @@ class TransactionEntryActivity : AppCompatActivity() {
         const val EXTRA_TRANSACTION_AMOUNT = "transaction_amount"
         const val EXTRA_TRANSACTION_MERCHANT = "transaction_merchant"
         const val EXTRA_ORIGINAL_SMS = "original_sms"
+        const val EXTRA_LATITUDE = "latitude"
+        const val EXTRA_LONGITUDE = "longitude"
         const val EXTRA_TRANSACTION_DATE = "transaction_date"
         const val EXTRA_TRANSACTION_REFERENCE = "transaction_reference"
         const val EXTRA_TRANSACTION_ACCOUNT = "transaction_account"
@@ -72,7 +86,6 @@ class TransactionEntryActivity : AppCompatActivity() {
     private lateinit var dateButton: Button
     private lateinit var saveButton: Button
     private lateinit var saveDraftButton: Button
-    private lateinit var deleteButton: Button
     private lateinit var originalSmsTextView: TextView
     private lateinit var splitPreviewText: TextView
     private lateinit var splitModeHintText: TextView
@@ -81,6 +94,7 @@ class TransactionEntryActivity : AppCompatActivity() {
     private lateinit var containerSplitAllocations: LinearLayout
     private lateinit var buttonToggleSms: MaterialButton
     private lateinit var buttonToggleMore: MaterialButton
+    private lateinit var buttonCustomizeSplit: MaterialButton
     private lateinit var containerMoreDetails: View
     private lateinit var originalSmsCard: View
     private lateinit var buttonPickSplitwiseGroup: MaterialButton
@@ -97,6 +111,9 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var transactionToEdit: Transaction? = null
     private var selectedTimestamp: Long = System.currentTimeMillis()
     private var originalSmsFromIntent: String? = null
+    private var latitude: Double? = null
+    private var longitude: Double? = null
+    private lateinit var buttonOpenLocation: View
     private var referenceFromIntent: String? = null
 
     private var selectedAccount: String = ""
@@ -104,6 +121,7 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var selectedCategory: String = ""
     private var selectedSubcategory: String = ""
     private var selectedSplitMode: String = SplitMode.EQUAL
+    private var customizeSplitExpanded: Boolean = false
     private var selectedSplitwiseGroupId: Long = 0L
     private var selectedSplitwiseExpenseId: Long = 0L
     private var currentReviewStatus: String = ReviewStatus.NEEDS_REVIEW
@@ -113,6 +131,9 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var loadedParticipantOrder = emptyList<String>()
     private var rebuildingAllocations = false
     private var suppressingParticipantCallback = false
+    private var canDeleteTransaction: Boolean = false
+    private var aiSuggestion: Suggestion? = null
+    private var aiApplied = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -135,7 +156,6 @@ class TransactionEntryActivity : AppCompatActivity() {
         dateButton = findViewById(R.id.buttonDate)
         saveButton = findViewById(R.id.buttonSaveTransaction)
         saveDraftButton = findViewById(R.id.buttonSaveDraft)
-        deleteButton = findViewById(R.id.buttonDeleteTransaction)
         originalSmsTextView = findViewById(R.id.textViewOriginalSms)
         splitPreviewText = findViewById(R.id.textViewSplitPreview)
         splitModeHintText = findViewById(R.id.textViewSplitModeHint)
@@ -143,7 +163,9 @@ class TransactionEntryActivity : AppCompatActivity() {
         chipGroupSplitMode = findViewById(R.id.chipGroupSplitMode)
         containerSplitAllocations = findViewById(R.id.containerSplitAllocations)
         buttonToggleSms = findViewById(R.id.buttonToggleSms)
+        buttonOpenLocation = findViewById(R.id.buttonOpenLocation)
         buttonToggleMore = findViewById(R.id.buttonToggleMore)
+        buttonCustomizeSplit = findViewById(R.id.buttonCustomizeSplit)
         containerMoreDetails = findViewById(R.id.containerMoreDetails)
         originalSmsCard = findViewById(R.id.card_original_sms)
         buttonPickSplitwiseGroup = findViewById(R.id.buttonPickSplitwiseGroup)
@@ -170,24 +192,26 @@ class TransactionEntryActivity : AppCompatActivity() {
         currentTransactionId = intent.getLongExtra(EXTRA_TRANSACTION_ID, INVALID_TRANSACTION_ID)
         if (currentTransactionId != INVALID_TRANSACTION_ID) {
             supportActionBar?.title = "Review Transaction"
-            deleteButton.visibility = View.VISIBLE
+            canDeleteTransaction = true
             loadTransactionData(currentTransactionId)
         } else {
             supportActionBar?.title = "Add Transaction"
-            deleteButton.visibility = View.GONE
+            canDeleteTransaction = false
             prefillFromSmsIntent()
         }
+        invalidateOptionsMenu()
 
         dateButton.setOnClickListener { showDatePickerDialog() }
         saveButton.setOnClickListener { saveOrUpdateTransaction(markReviewed = true) }
         saveDraftButton.setOnClickListener { saveOrUpdateTransaction(markReviewed = false) }
-        deleteButton.setOnClickListener { showDeleteConfirmationDialog() }
         buttonToggleSms.setOnClickListener {
             toggleSection(originalSmsCard, buttonToggleSms, R.string.show_original_sms, R.string.hide_original_sms)
         }
+        buttonOpenLocation.setOnClickListener { openLocationInMaps() }
         buttonToggleMore.setOnClickListener {
             toggleSection(containerMoreDetails, buttonToggleMore, R.string.add_split, R.string.hide_split)
         }
+        buttonCustomizeSplit.setOnClickListener { toggleCustomizeSplit() }
         buttonPickSplitwiseGroup.setOnClickListener { openSplitwiseGroupPicker() }
         buttonPushSplitwise.setOnClickListener { pushCurrentToSplitwise() }
         chipGroupParticipants.setOnCheckedStateChangeListener { _, _ ->
@@ -197,6 +221,27 @@ class TransactionEntryActivity : AppCompatActivity() {
             updatePushVisibility()
         }
         amountEditText.addTextChangedListener(SimpleWatcher { refreshSplitUi() })
+        setupAiAssist()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.transaction_entry_menu, menu)
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.action_delete_transaction)?.isVisible = canDeleteTransaction
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_delete_transaction -> {
+                showDeleteConfirmationDialog()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun setupFieldNavigation() {
@@ -236,6 +281,10 @@ class TransactionEntryActivity : AppCompatActivity() {
             val checkedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
             val chip = group.findViewById<Chip>(checkedId) ?: return@setOnCheckedStateChangeListener
             selectedSplitMode = SplitMode.normalize(chip.tag?.toString())
+            if (selectedSplitMode != SplitMode.EQUAL) {
+                customizeSplitExpanded = true
+            }
+            applyCustomizeSplitVisibility()
             rebuildAllocationRows()
             refreshSplitUi()
         }
@@ -421,6 +470,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 textSplitWithLabel.visibility = View.GONE
                 chipGroupParticipants.visibility = View.GONE
                 textSplitTypeLabel.visibility = View.GONE
+                buttonCustomizeSplit.visibility = View.GONE
                 chipGroupSplitMode.visibility = View.GONE
                 splitModeHintText.visibility = View.GONE
                 splitPreviewText.visibility = View.GONE
@@ -433,8 +483,10 @@ class TransactionEntryActivity : AppCompatActivity() {
             chipGroupParticipants.visibility = View.VISIBLE
             textSplitTypeLabel.visibility = View.VISIBLE
             chipGroupSplitMode.visibility = View.VISIBLE
+            buttonCustomizeSplit.visibility = View.VISIBLE
             splitModeHintText.visibility = View.VISIBLE
             splitPreviewText.visibility = View.VISIBLE
+            applyCustomizeSplitVisibility()
 
             val labels = SplitwiseMemberLabels.labelsFor(group.members, auth.currentUserId)
             val selectAll = selectAllIfEmpty && preferSelectedIds.isEmpty()
@@ -546,9 +598,41 @@ class TransactionEntryActivity : AppCompatActivity() {
     private fun selectSplitModeChip(mode: String) {
         val normalized = SplitMode.normalize(mode)
         selectedSplitMode = normalized
+        customizeSplitExpanded = normalized != SplitMode.EQUAL
         for (i in 0 until chipGroupSplitMode.childCount) {
             val chip = chipGroupSplitMode.getChildAt(i) as? Chip ?: continue
             chip.isChecked = SplitMode.normalize(chip.tag?.toString()) == normalized
+        }
+        applyCustomizeSplitVisibility()
+    }
+
+    private fun toggleCustomizeSplit() {
+        if (customizeSplitExpanded) {
+            customizeSplitExpanded = false
+            selectSplitModeChip(SplitMode.EQUAL)
+            rebuildAllocationRows()
+            refreshSplitUi()
+        } else {
+            customizeSplitExpanded = true
+            applyCustomizeSplitVisibility()
+        }
+    }
+
+    private fun applyCustomizeSplitVisibility() {
+        if (textSplitWithLabel.visibility != View.VISIBLE) {
+            return
+        }
+        chipGroupSplitMode.visibility = View.VISIBLE
+        buttonCustomizeSplit.visibility = View.VISIBLE
+        val advancedVisibility = if (customizeSplitExpanded) View.VISIBLE else View.GONE
+        findViewById<Chip>(R.id.chipSplitExact).visibility = advancedVisibility
+        findViewById<Chip>(R.id.chipSplitPercent).visibility = advancedVisibility
+        findViewById<Chip>(R.id.chipSplitWeight).visibility = advancedVisibility
+        buttonCustomizeSplit.setText(
+            if (customizeSplitExpanded) R.string.split_use_equal else R.string.split_customize
+        )
+        if (!customizeSplitExpanded) {
+            selectedSplitMode = SplitMode.EQUAL
         }
     }
 
@@ -658,6 +742,12 @@ class TransactionEntryActivity : AppCompatActivity() {
         val receivedAmount = intent.getDoubleExtra(EXTRA_TRANSACTION_AMOUNT, 0.0)
         val receivedMerchant = intent.getStringExtra(EXTRA_TRANSACTION_MERCHANT)
         originalSmsFromIntent = intent.getStringExtra(EXTRA_ORIGINAL_SMS)
+        if (intent.hasExtra(EXTRA_LATITUDE) && intent.hasExtra(EXTRA_LONGITUDE)) {
+            showLocation(
+                intent.getDoubleExtra(EXTRA_LATITUDE, 0.0),
+                intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
+            )
+        }
         referenceFromIntent = intent.getStringExtra(EXTRA_TRANSACTION_REFERENCE)
         val date = intent.getLongExtra(EXTRA_TRANSACTION_DATE, 0L)
         if (date > 0L) selectedTimestamp = date
@@ -677,6 +767,10 @@ class TransactionEntryActivity : AppCompatActivity() {
         } else {
             buttonToggleSms.visibility = View.GONE
             originalSmsCard.visibility = View.GONE
+        }
+
+        if (!receivedMerchant.isNullOrBlank()) {
+            applyMerchantMemory(receivedMerchant, preferExistingAccount = account.isNotBlank())
         }
     }
 
@@ -724,6 +818,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
                 originalSmsFromIntent = tx.originalSms
                 referenceFromIntent = tx.referenceNumber
+                showLocation(tx.latitude, tx.longitude)
                 if (!tx.originalSms.isNullOrEmpty()) {
                     originalSmsTextView.text = tx.originalSms
                     buttonToggleSms.visibility = View.VISIBLE
@@ -731,7 +826,46 @@ class TransactionEntryActivity : AppCompatActivity() {
                 } else {
                     buttonToggleSms.visibility = View.GONE
                 }
+                if (tx.category.isBlank() || tx.account.isBlank()) {
+                    applyMerchantMemory(
+                        tx.merchantName,
+                        preferExistingAccount = tx.account.isNotBlank()
+                    )
+                }
             }
+        }
+    }
+
+    private fun applyMerchantMemory(merchant: String, preferExistingAccount: Boolean) {
+        lifecycleScope.launch {
+            val hint = withContext(Dispatchers.IO) {
+                MerchantMemory.lookup(db, merchant)
+            } ?: return@launch
+            val filled = MerchantMemory.applyToBlankFields(
+                category = selectedCategory,
+                subcategory = selectedSubcategory,
+                account = if (preferExistingAccount && selectedAccount.isNotBlank()) {
+                    selectedAccount
+                } else {
+                    selectedAccount
+                },
+                transactionType = selectedType,
+                hint = hint
+            )
+            var changed = false
+            if (selectedCategory.isBlank() && filled.category.isNotBlank()) {
+                selectedCategory = filled.category
+                changed = true
+            }
+            if (selectedSubcategory.isBlank() && filled.subcategory.isNotBlank()) {
+                selectedSubcategory = filled.subcategory
+                changed = true
+            }
+            if (selectedAccount.isBlank() && filled.account.isNotBlank()) {
+                selectedAccount = filled.account
+                changed = true
+            }
+            if (changed) updatePickerLabels()
         }
     }
 
@@ -796,6 +930,167 @@ class TransactionEntryActivity : AppCompatActivity() {
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).show()
+    }
+
+    private fun showLocation(lat: Double?, lng: Double?) {
+        latitude = lat
+        longitude = lng
+        buttonOpenLocation.visibility = if (lat != null && lng != null) View.VISIBLE else View.GONE
+    }
+
+    private fun openLocationInMaps() {
+        val lat = latitude ?: return
+        val lng = longitude ?: return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng")))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.no_maps_app, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setupAiAssist() {
+        val settings = AgentSettings(this)
+        if (!settings.isReady) return
+        findViewById<View>(R.id.cardAiAssist).visibility = View.VISIBLE
+        val analyze = findViewById<MaterialButton>(R.id.buttonAiAnalyze)
+        val instruction = findViewById<EditText>(R.id.editAiInstruction)
+        val apply = findViewById<MaterialButton>(R.id.buttonAiApply)
+        val result = findViewById<View>(R.id.layoutAiResult)
+        analyze.setOnClickListener { runAiAssist(settings, instruction.text.toString().trim(), analyze) }
+        instruction.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId != EditorInfo.IME_ACTION_SEND) return@setOnEditorActionListener false
+            hideKeyboard(instruction)
+            analyze.performClick()
+            true
+        }
+        apply.setOnClickListener {
+            val s = aiSuggestion ?: return@setOnClickListener
+            aiApplied = !aiApplied
+            applyFormState(if (aiApplied) s.after else s.before)
+            apply.setText(if (aiApplied) R.string.ai_revert else R.string.ai_apply)
+            setAiStatus(if (aiApplied) getString(R.string.ai_applied) else null)
+        }
+        findViewById<MaterialButton>(R.id.buttonAiDismiss).setOnClickListener {
+            aiSuggestion = null
+            result.visibility = View.GONE
+            setAiStatus(null)
+        }
+    }
+
+    private fun runAiAssist(settings: AgentSettings, instruction: String, analyze: MaterialButton) {
+        val amount = amountEditText.text.toString().toDoubleOrNull()
+        if (amount == null || amount <= 0) {
+            amountEditText.error = "Invalid amount"; return
+        }
+        val current = formState()
+        val labels = (0 until chipGroupParticipants.childCount)
+            .mapNotNull { (chipGroupParticipants.getChildAt(it) as? Chip)?.text?.toString() }
+        findViewById<View>(R.id.layoutAiResult).visibility = View.GONE
+        setAiStatus(getString(R.string.ai_thinking))
+        analyze.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val hint = withContext(Dispatchers.IO) { MerchantMemory.lookup(db, current.merchantName) }
+                if (instruction.isEmpty() && hint != null && current.account.isNotBlank() &&
+                    hint.category.equals(current.category, ignoreCase = true)
+                ) {
+                    setAiStatus("Already matches merchant memory (${hint.category}). Type an instruction to change it.")
+                    return@launch
+                }
+                val request = AgentRequest(
+                    form = current,
+                    amount = amount,
+                    timestamp = selectedTimestamp,
+                    instruction = instruction,
+                    config = config,
+                    memberLabels = labels,
+                    memoryHint = hint?.let { "${it.category} / ${it.subcategory}, account ${it.account}" },
+                    originalSms = if (settings.includeSms) transactionToEdit?.originalSms ?: originalSmsFromIntent else null
+                )
+                val client = settings.client()
+                withContext(Dispatchers.IO) { client.propose(request) }
+                    .onSuccess { showAiSuggestion(it.validate(current, config, labels, amount)) }
+                    .onFailure { setAiStatus(it.message ?: "AI request failed") }
+            } finally {
+                analyze.isEnabled = true
+            }
+        }
+    }
+
+    private fun showAiSuggestion(s: Suggestion) {
+        // ponytail: Apply writes s.after wholesale; edits made while the request was in flight are overwritten (Revert restores them).
+        aiSuggestion = s
+        aiApplied = false
+        val text = buildString {
+            if (s.needsAttention) append("⚠ Needs attention\n")
+            s.diff().forEach { (label, before, after) -> append("$label: $before → $after\n") }
+            s.split?.takeIf { it.isValid && s.diff().any { d -> d.first == "Split" } }
+                ?.let { split ->
+                    append("   ")
+                    append(split.amounts.entries.joinToString(" · ") { "${it.key} ₹${it.value.toPlainString()}" })
+                    append('\n')
+                }
+            s.warnings.forEach { append("⚠ $it\n") }
+            if (s.reason.isNotBlank()) append("\nWhy: ${s.reason}")
+        }.trim()
+        findViewById<TextView>(R.id.textAiDiff).text = text.ifEmpty { getString(R.string.ai_no_changes) }
+        findViewById<MaterialButton>(R.id.buttonAiApply).apply {
+            setText(R.string.ai_apply)
+            visibility = if (s.hasChanges) View.VISIBLE else View.GONE
+        }
+        findViewById<View>(R.id.layoutAiResult).visibility = View.VISIBLE
+        setAiStatus(null)
+    }
+
+    private fun setAiStatus(message: String?) {
+        findViewById<TextView>(R.id.textAiStatus).apply {
+            text = message
+            visibility = if (message == null) View.GONE else View.VISIBLE
+        }
+    }
+
+    /** The editable fields exactly as [saveOrUpdateTransaction] would read them. */
+    private fun formState(): FormState = FormState(
+        merchantName = merchantEditText.text.toString().trim(),
+        transactionType = selectedType,
+        account = selectedAccount,
+        category = selectedCategory,
+        subcategory = selectedSubcategory,
+        notes = notesEditText.text.toString().trim(),
+        participants = if (isTransfer()) emptyList() else selectedParticipants(),
+        splitMode = selectedSplitMode,
+        splitAllocations = if (selectedSplitMode == SplitMode.EQUAL) emptyMap() else allocationInputs.toMap()
+    )
+
+    /** Fills the form only; persisting is still the user's Save / Save draft. */
+    private fun applyFormState(s: FormState) {
+        merchantEditText.setText(s.merchantName)
+        notesEditText.setText(s.notes)
+        selectedType = s.transactionType
+        selectedAccount = s.account
+        selectedCategory = s.category
+        selectedSubcategory = s.subcategory
+        updatePickerLabels()
+        if (isTransfer()) return
+        suppressingParticipantCallback = true
+        try {
+            for (i in 0 until chipGroupParticipants.childCount) {
+                val chip = chipGroupParticipants.getChildAt(i) as? Chip ?: continue
+                chip.isChecked = s.participants.any { it.equals(chip.text.toString(), ignoreCase = true) }
+            }
+        } finally {
+            suppressingParticipantCallback = false
+        }
+        allocationInputs.clear()
+        allocationInputs.putAll(s.splitAllocations)
+        selectSplitModeChip(s.splitMode)
+        rebuildAllocationRows()
+        refreshSplitUi()
+        updatePushVisibility()
+        if (s.participants.isNotEmpty()) {
+            containerMoreDetails.visibility = View.VISIBLE
+            buttonToggleMore.setText(R.string.hide_split)
+        }
     }
 
     private fun saveOrUpdateTransaction(markReviewed: Boolean) {
@@ -895,6 +1190,8 @@ class TransactionEntryActivity : AppCompatActivity() {
             splitwiseExpenseId = selectedSplitwiseExpenseId,
             splitwiseParticipantIds = Transaction.encodeParticipantIds(idMap),
             splitwisePushError = transactionToEdit?.splitwisePushError.orEmpty(),
+            latitude = latitude,
+            longitude = longitude,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
 
@@ -905,6 +1202,16 @@ class TransactionEntryActivity : AppCompatActivity() {
                         db.transactionDao().insertTransaction(transaction)
                     } else {
                         db.transactionDao().updateTransaction(transaction)
+                    }
+                    if (transaction.category.isNotBlank()) {
+                        MerchantMemory.remember(
+                            db = db,
+                            merchant = transaction.merchantName,
+                            category = transaction.category,
+                            subcategory = transaction.subcategory,
+                            account = transaction.account,
+                            transactionType = transaction.transactionType
+                        )
                     }
                 }
                 Toast.makeText(
@@ -942,10 +1249,13 @@ class TransactionEntryActivity : AppCompatActivity() {
             isSplit &&
             !isTransfer()
         buttonPushSplitwise.visibility = if (canShow) View.VISIBLE else View.GONE
-        if (selectedSplitwiseExpenseId > 0L) {
+        if (SplitwiseExpenseIds.isDone(selectedSplitwiseExpenseId)) {
             textSplitwisePushStatus.visibility = View.VISIBLE
-            textSplitwisePushStatus.text =
+            textSplitwisePushStatus.text = if (SplitwiseExpenseIds.isManualSuccess(selectedSplitwiseExpenseId)) {
+                getString(R.string.splitwise_marked_done_manual)
+            } else {
                 getString(R.string.splitwise_already_pushed, selectedSplitwiseExpenseId)
+            }
             buttonPushSplitwise.isEnabled = false
         } else {
             textSplitwisePushStatus.visibility = View.GONE

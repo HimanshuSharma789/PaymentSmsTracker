@@ -26,6 +26,21 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE reviewStatus = :status ORDER BY timestamp DESC")
     suspend fun getTransactionsByStatusList(status: String): List<Transaction>
 
+    @Query("SELECT COUNT(*) FROM transactions WHERE reviewStatus = :status")
+    fun countByStatus(status: String): Flow<Int>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions
+        WHERE participants IS NOT NULL
+          AND TRIM(participants) != ''
+          AND UPPER(TRIM(participants)) != 'ME'
+          AND reviewStatus = 'exported'
+          AND splitwiseExpenseId = 0
+        """
+    )
+    fun countPendingSplits(): Flow<Int>
+
     @Query(
         """
         SELECT * FROM transactions
@@ -47,7 +62,7 @@ interface TransactionDao {
           AND UPPER(TRIM(participants)) != 'ME'
           AND (
             (reviewStatus = 'exported' AND splitwiseExpenseId = 0)
-            OR splitwiseExpenseId > 0
+            OR splitwiseExpenseId != 0
           )
         ORDER BY timestamp DESC
         """
@@ -111,6 +126,20 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     suspend fun getTransactionById(transactionId: Long): Transaction?
+
+    /**
+     * Recent categorized rows for merchant-memory fallback when prefs miss.
+     */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE TRIM(category) != ''
+          AND reviewStatus IN ('reviewed', 'exported')
+        ORDER BY lastUpdatedTimestamp DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun getRecentCategorizedForMemory(limit: Int): List<Transaction>
 
     @Query(
         """

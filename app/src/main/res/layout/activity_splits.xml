@@ -101,6 +101,15 @@
             android:text="@string/splitwise_select_and_push" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonMarkSuccessFromSplits"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="8dp"
+            android:text="@string/splitwise_mark_success" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonExportSplitwiseFromSplits"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"

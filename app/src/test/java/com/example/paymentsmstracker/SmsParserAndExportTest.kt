@@ -312,6 +312,7 @@ class SmsParserAndExportTest {
             category = "Culture",
             subcategory = "Movie",
             account = "HSBC",
+            notes = "Birthday outing",
             timestamp = 1_720_000_000_000L,
             participants = "ME,PUNEET,KUSHAGRA,MUKUL",
             reviewStatus = "reviewed",
@@ -320,6 +321,8 @@ class SmsParserAndExportTest {
         assertTrue(SplitwiseExporter.isSplit(tx))
         val csv = SplitwiseExporter.toCsv(listOf(tx), onlySplits = true)
         assertTrue(csv.contains("Paid by"))
+        assertTrue(csv.contains("\"Notes\""))
+        assertTrue(csv.contains("Birthday outing"))
         assertTrue(csv.contains("25.00"))
         assertTrue(csv.contains("Movie"))
         val ledger = SplitwiseExporter.toSplitLedgerCsv(listOf(tx))

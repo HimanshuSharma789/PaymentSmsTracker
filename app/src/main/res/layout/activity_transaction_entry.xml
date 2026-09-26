@@ -44,6 +44,18 @@
                 android:textAllCaps="false"
                 app:icon="@drawable/baseline_sms_24" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonOpenLocation"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="start|center_vertical"
+                android:text="@string/view_location_on_map"
+                android:textAllCaps="false"
+                android:visibility="gone"
+                app:icon="@drawable/baseline_place_24"
+                tools:visibility="visible" />
+
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/card_original_sms"
                 style="?attr/materialCardViewOutlinedStyle"
@@ -60,6 +72,100 @@
                     android:padding="12dp"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     tools:text="Original SMS..." />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAiAssist"
+                style="?attr/materialCardViewOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/ai_assist"
+                        android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="@string/ai_instruction_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editAiInstruction"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:imeOptions="actionSend"
+                            android:inputType="textCapSentences" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonAiAnalyze"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/ai_analyze" />
+
+                    <TextView
+                        android:id="@+id/textAiStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:text="Thinking…"
+                        tools:visibility="visible" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutAiResult"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <TextView
+                            android:id="@+id/textAiDiff"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            tools:text="Category: – → Food\nSplit: – → Equal: ME, Puneet S\n  ME ₹420 · Puneet S ₹420\n\nWhy: Swiggy order" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="end"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonAiDismiss"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ai_dismiss" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonAiApply"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/ai_apply" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
@@ -261,7 +367,8 @@
                             style="?attr/materialButtonOutlinedStyle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:minHeight="40dp"
+                            android:minHeight="48dp"
+                            android:paddingVertical="10dp"
                             android:text="@string/splitwise_group_picker"
                             android:textAllCaps="false" />
 
@@ -330,7 +437,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/split_exact"
-                                android:tag="exact" />
+                                android:tag="exact"
+                                android:visibility="gone"
+                                tools:visibility="visible" />
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/chipSplitPercent"
@@ -338,7 +447,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/split_percent"
-                                android:tag="percent" />
+                                android:tag="percent"
+                                android:visibility="gone"
+                                tools:visibility="visible" />
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/chipSplitWeight"
@@ -346,7 +457,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/split_weight"
-                                android:tag="weight" />
+                                android:tag="weight"
+                                android:visibility="gone"
+                                tools:visibility="visible" />
                         </com.google.android.material.chip.ChipGroup>
 
                         <TextView
@@ -356,6 +469,19 @@
                             android:layout_marginTop="4dp"
                             android:text="@string/split_hint_equal"
                             android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonCustomizeSplit"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginTop="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="4dp"
+                            android:text="@string/split_customize"
+                            android:textAllCaps="false"
                             android:visibility="gone"
                             tools:visibility="visible" />
 
@@ -398,17 +524,6 @@
                             android:text="@string/splitwise_push_one"
                             android:visibility="gone"
                             tools:visibility="visible" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonDeleteTransaction"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="40dp"
-                            android:layout_marginTop="4dp"
-                            android:text="@string/delete_transaction"
-                            android:textColor="?attr/colorError"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
@@ -442,7 +557,7 @@
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginStart="8dp"
-                android:layout_weight="2"
+                android:layout_weight="1"
                 android:text="@string/save_reviewed" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

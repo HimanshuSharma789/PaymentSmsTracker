@@ -280,6 +280,14 @@
                     android:layout_marginTop="8dp"
                     android:text="@string/inject_as_needs_review" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonCreateSmsRule"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/create_rule_from_sms" />
+
                 <TextView
                     android:id="@+id/textParseResult"
                     android:layout_width="match_parent"
@@ -661,6 +669,16 @@
                     app:strokeColor="?attr/colorError" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonClearExportedOlder"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/clear_mm_exported_older"
+                    android:textColor="?attr/colorError"
+                    app:strokeColor="?attr/colorError" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonClearAll"
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="match_parent"
@@ -774,13 +792,21 @@
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
-                <!-- 1. Direct signup / web session -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/splitwise_auth_recommended"
+                    android:textAppearance="?attr/textAppearanceLabelLarge"
+                    android:textColor="?attr/colorPrimary" />
+
+                <!-- Recommended: Direct signup / web session -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardSplitwiseDirectAuth"
                     style="?attr/materialCardViewOutlinedStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     app:strokeColor="?attr/colorPrimary"
                     app:strokeWidth="1dp">
 
@@ -813,15 +839,82 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 2. OAuth app -->
+                <!-- Alternative: API token -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSplitwiseTokenAuth"
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:strokeColor="?attr/colorTertiary"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splitwise_auth_token_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall"
+                            android:textColor="?attr/colorTertiary" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/splitwise_auth_token_hint"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:hint="@string/splitwise_api_key"
+                            app:helperText="@string/splitwise_api_key_hint"
+                            app:helperTextEnabled="true">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editSplitwiseApiKey"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textPassword"
+                                android:maxLines="2" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonSplitwiseConnectApiKey"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/splitwise_connect_api_key" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonSplitwiseAdvancedToggle"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="start|center_vertical"
+                    android:text="@string/splitwise_auth_advanced"
+                    android:textAllCaps="false" />
+
+                <!-- Advanced: OAuth app (collapsed by default) -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardSplitwiseOAuthAuth"
                     style="?attr/materialCardViewOutlinedStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="24dp"
+                    android:visibility="gone"
                     app:strokeColor="?attr/colorSecondary"
-                    app:strokeWidth="1dp">
+                    app:strokeWidth="1dp"
+                    tools:visibility="visible">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -902,17 +995,34 @@
                             android:text="@string/splitwise_auth_oauth_action" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
 
-                <!-- 3. API token -->
+        <!-- Tab: Permissions -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/panelPermissions"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/admin_tab_permissions_hint"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
+
                 <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardSplitwiseTokenAuth"
-                    android:layout_marginBottom="24dp"
                     style="?attr/materialCardViewOutlinedStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    app:strokeColor="?attr/colorTertiary"
-                    app:strokeWidth="1dp">
+                    android:layout_marginTop="20dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -923,41 +1033,263 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/splitwise_auth_token_title"
-                            android:textAppearance="?attr/textAppearanceTitleSmall"
-                            android:textColor="?attr/colorTertiary" />
+                            android:text="@string/perm_sms_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
 
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="@string/splitwise_auth_token_hint"
+                            android:text="@string/perm_sms_reason"
                             android:textAppearance="?attr/textAppearanceBodySmall" />
 
-                        <com.google.android.material.textfield.TextInputLayout
+                        <TextView
+                            android:id="@+id/textPermSmsStatus"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:hint="@string/splitwise_api_key"
-                            app:helperText="@string/splitwise_api_key_hint"
-                            app:helperTextEnabled="true">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/editSplitwiseApiKey"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="textPassword"
-                                android:maxLines="2" />
-                        </com.google.android.material.textfield.TextInputLayout>
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            tools:text="Status: Off" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonSplitwiseConnectApiKey"
+                            android:id="@+id/buttonPermSms"
+                            style="?attr/materialButtonOutlinedStyle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:text="@string/splitwise_connect_api_key" />
+                            android:layout_marginTop="8dp"
+                            tools:text="Allow" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/perm_notifications_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/perm_notifications_reason"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <TextView
+                            android:id="@+id/textPermNotificationsStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            tools:text="Status: Off" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonPermNotifications"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            tools:text="Allow" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="?attr/materialCardViewOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/perm_location_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/perm_location_reason"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                        <TextView
+                            android:id="@+id/textPermLocationStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            tools:text="Status: Off" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonPermLocation"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            tools:text="Allow" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- Tab 8: AI Assist -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/panelAi"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/admin_tab_ai_hint"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAiEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/ai_enable" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/ai_provider"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupAiProvider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:chipSpacingHorizontal="8dp"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="CLAUDE"
+                        android:text="@string/ai_provider_claude" />
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="OPENROUTER"
+                        android:text="@string/ai_provider_openrouter" />
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="OPENAI_COMPATIBLE"
+                        android:text="@string/ai_provider_openai" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <TextView
+                    android:id="@+id/textAiProviderHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="@string/ai_provider_claude_hint" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/ai_base_url">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editAiBaseUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/ai_model">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editAiModel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutAiApiKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/ai_api_key"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editAiApiKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonAiSave"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/ai_save" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/ai_privacy"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAiIncludeSms"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/ai_include_sms" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/ai_disclosure"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </FrameLayout>

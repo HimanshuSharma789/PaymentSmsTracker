@@ -43,14 +43,25 @@ class SmsParser(private val config: AppConfig) {
      * @param receivedAtMs SMS inbox/received time. Used when the body has no usable date,
      * or to supply time-of-day when the body has a date but no clock time.
      */
-    fun parse(message: String, receivedAtMs: Long? = null): ParsedSms? {
-        if (!looksLikePayment(message)) return null
+    fun parse(
+        message: String,
+        receivedAtMs: Long? = null,
+        requirePaymentHeuristic: Boolean = true
+    ): ParsedSms? {
+        if (requirePaymentHeuristic && !looksLikePayment(message)) return null
 
         for (rule in config.smsParseRules.filter { it.enabled }) {
             parseWithRule(message, rule, receivedAtMs)?.let { return it }
         }
         return fallbackParse(message, receivedAtMs)
     }
+
+    /** Try a single rule (used by the SMS rule wizard verify step). */
+    fun parseWithRulePublic(
+        message: String,
+        rule: SmsParseRule,
+        receivedAtMs: Long? = null
+    ): ParsedSms? = parseWithRule(message, rule, receivedAtMs)
 
     private fun parseWithRule(
         message: String,

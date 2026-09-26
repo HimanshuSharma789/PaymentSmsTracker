@@ -184,21 +184,21 @@ class SplitwiseAuthStore(context: Context) {
                 .getOrDefault(SplitwiseAuthMethod.NONE)
         }
 
-        fun createSecurePrefs(context: Context): SharedPreferences {
+        fun createSecurePrefs(context: Context, name: String = PREFS_SECURE): SharedPreferences {
             return try {
                 val masterKey = MasterKey.Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
                 EncryptedSharedPreferences.create(
                     context,
-                    PREFS_SECURE,
+                    name,
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Encrypted prefs unavailable; using private SharedPreferences", e)
-                context.getSharedPreferences(PREFS_SECURE, Context.MODE_PRIVATE)
+                context.getSharedPreferences(name, Context.MODE_PRIVATE)
             }
         }
 
