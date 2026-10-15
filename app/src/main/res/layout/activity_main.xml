@@ -178,6 +178,15 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/view_all_transactions"
                 app:icon="@drawable/baseline_history_24" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonHomeAgentChat"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/agent_chat_open"
+                app:icon="@drawable/baseline_auto_awesome_24" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

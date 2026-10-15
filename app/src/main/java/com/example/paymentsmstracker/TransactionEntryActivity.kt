@@ -24,11 +24,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.paymentsmstracker.agent.AgentRequest
-import com.example.paymentsmstracker.agent.AgentSettings
-import com.example.paymentsmstracker.agent.FormState
-import com.example.paymentsmstracker.agent.Suggestion
-import com.example.paymentsmstracker.agent.validate
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
@@ -132,8 +127,6 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var rebuildingAllocations = false
     private var suppressingParticipantCallback = false
     private var canDeleteTransaction: Boolean = false
-    private var aiSuggestion: Suggestion? = null
-    private var aiApplied = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -221,7 +214,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             updatePushVisibility()
         }
         amountEditText.addTextChangedListener(SimpleWatcher { refreshSplitUi() })
-        setupAiAssist()
+        setupAiChatButton()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -948,148 +941,13 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupAiAssist() {
-        val settings = AgentSettings(this)
-        if (!settings.isReady) return
-        findViewById<View>(R.id.cardAiAssist).visibility = View.VISIBLE
-        val analyze = findViewById<MaterialButton>(R.id.buttonAiAnalyze)
-        val instruction = findViewById<EditText>(R.id.editAiInstruction)
-        val apply = findViewById<MaterialButton>(R.id.buttonAiApply)
-        val result = findViewById<View>(R.id.layoutAiResult)
-        analyze.setOnClickListener { runAiAssist(settings, instruction.text.toString().trim(), analyze) }
-        instruction.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId != EditorInfo.IME_ACTION_SEND) return@setOnEditorActionListener false
-            hideKeyboard(instruction)
-            analyze.performClick()
-            true
-        }
-        apply.setOnClickListener {
-            val s = aiSuggestion ?: return@setOnClickListener
-            aiApplied = !aiApplied
-            applyFormState(if (aiApplied) s.after else s.before)
-            apply.setText(if (aiApplied) R.string.ai_revert else R.string.ai_apply)
-            setAiStatus(if (aiApplied) getString(R.string.ai_applied) else null)
-        }
-        findViewById<MaterialButton>(R.id.buttonAiDismiss).setOnClickListener {
-            aiSuggestion = null
-            result.visibility = View.GONE
-            setAiStatus(null)
-        }
-    }
-
-    private fun runAiAssist(settings: AgentSettings, instruction: String, analyze: MaterialButton) {
-        val amount = amountEditText.text.toString().toDoubleOrNull()
-        if (amount == null || amount <= 0) {
-            amountEditText.error = "Invalid amount"; return
-        }
-        val current = formState()
-        val labels = (0 until chipGroupParticipants.childCount)
-            .mapNotNull { (chipGroupParticipants.getChildAt(it) as? Chip)?.text?.toString() }
-        findViewById<View>(R.id.layoutAiResult).visibility = View.GONE
-        setAiStatus(getString(R.string.ai_thinking))
-        analyze.isEnabled = false
-        lifecycleScope.launch {
-            try {
-                val hint = withContext(Dispatchers.IO) { MerchantMemory.lookup(db, current.merchantName) }
-                if (instruction.isEmpty() && hint != null && current.account.isNotBlank() &&
-                    hint.category.equals(current.category, ignoreCase = true)
-                ) {
-                    setAiStatus("Already matches merchant memory (${hint.category}). Type an instruction to change it.")
-                    return@launch
-                }
-                val request = AgentRequest(
-                    form = current,
-                    amount = amount,
-                    timestamp = selectedTimestamp,
-                    instruction = instruction,
-                    config = config,
-                    memberLabels = labels,
-                    memoryHint = hint?.let { "${it.category} / ${it.subcategory}, account ${it.account}" },
-                    originalSms = if (settings.includeSms) transactionToEdit?.originalSms ?: originalSmsFromIntent else null
-                )
-                val client = settings.client()
-                withContext(Dispatchers.IO) { client.propose(request) }
-                    .onSuccess { showAiSuggestion(it.validate(current, config, labels, amount)) }
-                    .onFailure { setAiStatus(it.message ?: "AI request failed") }
-            } finally {
-                analyze.isEnabled = true
+    private fun setupAiChatButton() {
+        findViewById<MaterialButton>(R.id.buttonAiOpenChat).setOnClickListener {
+            val intent = Intent(this, AgentChatActivity::class.java)
+            if (currentTransactionId != INVALID_TRANSACTION_ID) {
+                intent.putExtra(AgentChatActivity.EXTRA_TRANSACTION_ID, currentTransactionId)
             }
-        }
-    }
-
-    private fun showAiSuggestion(s: Suggestion) {
-        // ponytail: Apply writes s.after wholesale; edits made while the request was in flight are overwritten (Revert restores them).
-        aiSuggestion = s
-        aiApplied = false
-        val text = buildString {
-            if (s.needsAttention) append("⚠ Needs attention\n")
-            s.diff().forEach { (label, before, after) -> append("$label: $before → $after\n") }
-            s.split?.takeIf { it.isValid && s.diff().any { d -> d.first == "Split" } }
-                ?.let { split ->
-                    append("   ")
-                    append(split.amounts.entries.joinToString(" · ") { "${it.key} ₹${it.value.toPlainString()}" })
-                    append('\n')
-                }
-            s.warnings.forEach { append("⚠ $it\n") }
-            if (s.reason.isNotBlank()) append("\nWhy: ${s.reason}")
-        }.trim()
-        findViewById<TextView>(R.id.textAiDiff).text = text.ifEmpty { getString(R.string.ai_no_changes) }
-        findViewById<MaterialButton>(R.id.buttonAiApply).apply {
-            setText(R.string.ai_apply)
-            visibility = if (s.hasChanges) View.VISIBLE else View.GONE
-        }
-        findViewById<View>(R.id.layoutAiResult).visibility = View.VISIBLE
-        setAiStatus(null)
-    }
-
-    private fun setAiStatus(message: String?) {
-        findViewById<TextView>(R.id.textAiStatus).apply {
-            text = message
-            visibility = if (message == null) View.GONE else View.VISIBLE
-        }
-    }
-
-    /** The editable fields exactly as [saveOrUpdateTransaction] would read them. */
-    private fun formState(): FormState = FormState(
-        merchantName = merchantEditText.text.toString().trim(),
-        transactionType = selectedType,
-        account = selectedAccount,
-        category = selectedCategory,
-        subcategory = selectedSubcategory,
-        notes = notesEditText.text.toString().trim(),
-        participants = if (isTransfer()) emptyList() else selectedParticipants(),
-        splitMode = selectedSplitMode,
-        splitAllocations = if (selectedSplitMode == SplitMode.EQUAL) emptyMap() else allocationInputs.toMap()
-    )
-
-    /** Fills the form only; persisting is still the user's Save / Save draft. */
-    private fun applyFormState(s: FormState) {
-        merchantEditText.setText(s.merchantName)
-        notesEditText.setText(s.notes)
-        selectedType = s.transactionType
-        selectedAccount = s.account
-        selectedCategory = s.category
-        selectedSubcategory = s.subcategory
-        updatePickerLabels()
-        if (isTransfer()) return
-        suppressingParticipantCallback = true
-        try {
-            for (i in 0 until chipGroupParticipants.childCount) {
-                val chip = chipGroupParticipants.getChildAt(i) as? Chip ?: continue
-                chip.isChecked = s.participants.any { it.equals(chip.text.toString(), ignoreCase = true) }
-            }
-        } finally {
-            suppressingParticipantCallback = false
-        }
-        allocationInputs.clear()
-        allocationInputs.putAll(s.splitAllocations)
-        selectSplitModeChip(s.splitMode)
-        rebuildAllocationRows()
-        refreshSplitUi()
-        updatePushVisibility()
-        if (s.participants.isNotEmpty()) {
-            containerMoreDetails.visibility = View.VISIBLE
-            buttonToggleMore.setText(R.string.hide_split)
+            startActivity(intent)
         }
     }
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_chat_title">AI Assist</string>
+    <string name="agent_chat_open">AI Assist chat</string>
+    <string name="agent_chat_hint">Ask or tell the assistant…</string>
+    <string name="agent_chat_send">Send</string>
+    <string name="agent_chat_not_ready">AI Assist is off. Enable it in Settings → AI Assist.</string>
+    <string name="agent_chat_empty">Try one of these:</string>
+    <string name="agent_chat_apply">Apply</string>
+    <string name="agent_chat_skip">Skip</string>
+    <string name="agent_chat_undo">Undo</string>
+    <string name="agent_chat_apply_all">Apply all (%d)</string>
+    <string name="agent_chat_applied">Applied</string>
+    <string name="agent_chat_skipped">Skipped</string>
+    <string name="agent_chat_failed">Failed</string>
+    <string name="agent_chat_mark_reviewed">Status: needs review → reviewed</string>
+    <string-array name="agent_chat_examples">
+        <item>Review my pending transactions</item>
+        <item>Split last night\'s dinner equally with Puneet</item>
+        <item>Move all Zomato this month to Food</item>
+        <item>How much do friends owe me this month?</item>
+    </string-array>
+</resources>
