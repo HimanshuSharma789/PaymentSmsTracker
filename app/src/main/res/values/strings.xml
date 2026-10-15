@@ -45,6 +45,7 @@
     <string name="split_use_equal">Use equal split</string>
     <string name="split_pick_group_first">Choose a Splitwise group, then pick who shares this expense.</string>
     <string name="split_sync_groups_hint">Sync Splitwise groups in Admin first.</string>
+    <string name="splitwise_save_before_push">Save your changes first; Push sends the saved transaction</string>
     <string name="splitwise_push_needs_reviewed">Mark as reviewed before pushing to Splitwise</string>
     <string name="split_equal">Equal</string>
     <string name="split_exact">Uneven</string>
@@ -208,7 +209,7 @@
     <string name="clear_mm_exported">Clear MM exported</string>
     <string name="clear_mm_exported_older">Delete MM exported older than 30 days</string>
     <string name="clear_mm_exported_older_title">Delete old MM exports?</string>
-    <string name="clear_mm_exported_older_message">Delete %1$d MM-exported transaction(s) last updated more than 30 days ago? This cannot be undone. Shared expenses already on Splitwise are included if they match.</string>
+    <string name="clear_mm_exported_older_message">Delete %1$d MM-exported transaction(s) last updated more than 30 days ago? This cannot be undone. Shared expenses already on Splitwise are included; splits still waiting to be pushed are kept.</string>
     <string name="clear_mm_exported_older_none">No MM-exported transactions older than 30 days</string>
     <string name="clear_mm_exported_older_done">Deleted %1$d old MM-exported transaction(s)</string>
     <string name="export_all_raw">Export All (Raw CSV)</string>

@@ -10,11 +10,24 @@ import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
 class FileHandler {
+
+    /** Writes on IO and tells the user whether the file really landed in Downloads. */
+    suspend fun exportCsv(context: Context, filename: String, content: String): Boolean {
+        val uri = withContext(Dispatchers.IO) { saveCsvFileToDownloads(context, filename, content) }
+        Toast.makeText(
+            context,
+            if (uri != null) "Exported → Downloads/$filename" else "Export failed: couldn't write $filename",
+            Toast.LENGTH_LONG
+        ).show()
+        return uri != null
+    }
 
     fun saveCsvFileToDownloads(context: Context, filename: String, content: String): Uri? {
         return saveTextFile(context, filename, content, mimeType = "text/csv")

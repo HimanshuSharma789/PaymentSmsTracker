@@ -75,6 +75,7 @@ class ConfigStore(context: Context) {
             .put("nightlyReviewHour", config.nightlyReviewHour)
             .put("nightlyReviewMinute", config.nightlyReviewMinute)
             .put("themeMode", config.themeMode)
+            .put("bankSenderTokens", JSONArray(config.bankSenderTokens))
     }
 
     companion object {
@@ -87,7 +88,7 @@ class ConfigStore(context: Context) {
          * `version < N` block in [parse]. Merges run once: the next save stamps this version,
          * so accounts/rules the user deleted afterwards stay deleted.
          */
-        const val CONFIG_VERSION = 1
+        const val CONFIG_VERSION = 2
 
         fun parse(raw: String): AppConfig = fromJson(JSONObject(raw))
 
@@ -159,6 +160,15 @@ class ConfigStore(context: Context) {
                     refreshed + AppConfig.DEFAULT_SMS_RULES.filter { it.id !in existingIds }
                 }
                 else -> loadedRules
+            }.map { rule ->
+                // v1 → v2: fix the stock generic rule's dead reference capture (only if unedited).
+                if (version < 2 && rule.id == "generic_paid_to_on" &&
+                    rule.pattern == AppConfig.GENERIC_PAID_TO_ON_PATTERN_V1
+                ) {
+                    rule.copy(pattern = AppConfig.GENERIC_PAID_TO_ON_PATTERN)
+                } else {
+                    rule
+                }
             }
 
             return AppConfig(
@@ -174,7 +184,9 @@ class ConfigStore(context: Context) {
                 nightlyReviewReminderEnabled = obj.optBoolean("nightlyReviewReminderEnabled", true),
                 nightlyReviewHour = obj.optInt("nightlyReviewHour", 21).coerceIn(0, 23),
                 nightlyReviewMinute = obj.optInt("nightlyReviewMinute", 0).coerceIn(0, 59),
-                themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DYNAMIC))
+                themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DYNAMIC)),
+                bankSenderTokens = obj.optJSONArray("bankSenderTokens")?.toStringList()
+                    ?: AppConfig.DEFAULT_BANK_SENDER_TOKENS
             )
         }
 

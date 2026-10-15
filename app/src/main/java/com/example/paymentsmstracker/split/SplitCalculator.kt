@@ -143,6 +143,18 @@ object SplitCalculator {
         )
     }
 
+    /**
+     * For display/CSV only: the stored split, or an equal split when it is invalid (e.g. exact
+     * amounts that no longer add up after an amount edit). Money Manager export refuses invalid
+     * splits instead (see MoneyManagerSync), so MM and Splitwise never disagree.
+     */
+    fun resolveOrEqual(transaction: Transaction): SplitAllocationResult {
+        val split = resolve(transaction)
+        return if (split.isValid) split else {
+            resolve(transaction.amount, transaction.participantList(), SplitMode.EQUAL, emptyMap())
+        }
+    }
+
     private data class Intermediate(
         val amounts: Map<String, BigDecimal> = emptyMap(),
         val error: String? = null

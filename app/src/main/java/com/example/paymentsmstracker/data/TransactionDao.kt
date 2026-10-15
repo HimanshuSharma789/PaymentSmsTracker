@@ -8,6 +8,15 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+/** MM-exported shared expense not yet pushed to Splitwise (the Splits "Pending" queue). */
+const val PENDING_SPLIT = """
+    participants IS NOT NULL
+      AND TRIM(participants) != ''
+      AND UPPER(TRIM(participants)) != 'ME'
+      AND reviewStatus = 'exported'
+      AND splitwiseExpenseId = 0
+"""
+
 @Dao
 interface TransactionDao {
 
@@ -41,15 +50,6 @@ interface TransactionDao {
     )
     fun countPendingSplits(): Flow<Int>
 
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE timestamp >= :dayStart AND timestamp < :dayEnd
-        ORDER BY timestamp DESC
-        """
-    )
-    fun getTransactionsForDay(dayStart: Long, dayEnd: Long): Flow<List<Transaction>>
-
     /**
      * Splits screen: pending (MM-exported, not pushed, including failures)
      * plus successful Splitwise pushes.
@@ -69,23 +69,6 @@ interface TransactionDao {
     )
     fun getSplitsForTable(): Flow<List<Transaction>>
 
-    /**
-     * Pending Splitwise queue: MM-exported shared expenses that are not pushed yet
-     * (includes previous push failures).
-     */
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE participants IS NOT NULL
-          AND TRIM(participants) != ''
-          AND UPPER(TRIM(participants)) != 'ME'
-          AND reviewStatus = 'exported'
-          AND splitwiseExpenseId = 0
-        ORDER BY timestamp DESC
-        """
-    )
-    fun getPendingSplitTransactions(): Flow<List<Transaction>>
-
     @Query(
         """
         SELECT * FROM transactions
@@ -98,31 +81,6 @@ interface TransactionDao {
         """
     )
     suspend fun getPendingSplitTransactionsList(): List<Transaction>
-
-    /** Legacy alias used by CSV export helpers that still want reviewed+exported splits. */
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE participants IS NOT NULL
-          AND TRIM(participants) != ''
-          AND UPPER(TRIM(participants)) != 'ME'
-          AND reviewStatus IN ('reviewed', 'exported')
-        ORDER BY timestamp DESC
-        """
-    )
-    fun getSplitTransactions(): Flow<List<Transaction>>
-
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE participants IS NOT NULL
-          AND TRIM(participants) != ''
-          AND UPPER(TRIM(participants)) != 'ME'
-          AND reviewStatus IN ('reviewed', 'exported')
-        ORDER BY timestamp DESC
-        """
-    )
-    suspend fun getSplitTransactionsList(): List<Transaction>
 
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     suspend fun getTransactionById(transactionId: Long): Transaction?
@@ -141,37 +99,15 @@ interface TransactionDao {
     )
     suspend fun getRecentCategorizedForMemory(limit: Int): List<Transaction>
 
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE referenceNumber = :reference
-        LIMIT 1
-        """
-    )
-    suspend fun findByReference(reference: String): Transaction?
+    // SMS dedupe candidates (see SmsIngest).
+    @Query("SELECT * FROM transactions WHERE timestamp BETWEEN :from AND :to")
+    suspend fun getTransactionsBetween(from: Long, to: Long): List<Transaction>
 
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE originalSms = :originalSms
-        LIMIT 1
-        """
-    )
-    suspend fun findByOriginalSms(originalSms: String): Transaction?
+    @Query("SELECT * FROM transactions WHERE TRIM(referenceNumber) = :reference COLLATE NOCASE")
+    suspend fun findAllByReference(reference: String): List<Transaction>
 
-    @Query(
-        """
-        SELECT * FROM transactions
-        WHERE amount = :amount
-          AND merchantName = :merchant
-          AND timestamp >= :since
-        LIMIT 1
-        """
-    )
-    suspend fun findRecentDuplicate(amount: Double, merchant: String, since: Long): Transaction?
-
-    @Query("DELETE FROM transactions WHERE id = :transactionId")
-    suspend fun deleteTransactionById(transactionId: Long)
+    @Query("SELECT * FROM transactions WHERE originalSms = :originalSms")
+    suspend fun findAllByOriginalSms(originalSms: String): List<Transaction>
 
     @Query("DELETE FROM transactions WHERE id IN (:ids)")
     suspend fun deleteTransactionsByIds(ids: List<Long>): Int
@@ -179,7 +115,8 @@ interface TransactionDao {
     @Query("DELETE FROM transactions")
     suspend fun deleteAllTransactions()
 
-    @Query("DELETE FROM transactions WHERE reviewStatus = :status")
+    /** Keeps exported splits still waiting for Splitwise: deleting them would lose the push. */
+    @Query("DELETE FROM transactions WHERE reviewStatus = :status AND NOT ($PENDING_SPLIT)")
     suspend fun deleteTransactionsByStatus(status: String): Int
 
     @Query(
@@ -196,6 +133,7 @@ interface TransactionDao {
         DELETE FROM transactions
         WHERE reviewStatus = :status
           AND lastUpdatedTimestamp < :olderThan
+          AND NOT ($PENDING_SPLIT)
         """
     )
     suspend fun deleteExportedOlderThan(status: String, olderThan: Long): Int

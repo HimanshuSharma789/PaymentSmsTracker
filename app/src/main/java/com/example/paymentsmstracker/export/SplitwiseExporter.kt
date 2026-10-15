@@ -74,12 +74,9 @@ object SplitwiseExporter {
         val body = transactions.filter { isSplit(it) }.joinToString("\n") { tx ->
             val people = tx.participantList()
             val total = BigDecimal.valueOf(tx.amount).setScale(2, RoundingMode.HALF_UP)
-            val split = SplitCalculator.resolve(tx)
-            val myShare = if (split.isValid) split.myShare else {
-                val share = total.divide(BigDecimal(people.size.coerceAtLeast(1)), 2, RoundingMode.HALF_UP)
-                if (people.any { it.equals("ME", true) }) share else BigDecimal.ZERO.setScale(2)
-            }
-            val friendsOwe = if (split.isValid) split.friendsOwe else total.subtract(myShare)
+            val split = SplitCalculator.resolveOrEqual(tx)
+            val myShare = split.myShare
+            val friendsOwe = split.friendsOwe
             listOf(
                 dateFmt.format(Date(tx.timestamp)),
                 q(tx.merchantName),

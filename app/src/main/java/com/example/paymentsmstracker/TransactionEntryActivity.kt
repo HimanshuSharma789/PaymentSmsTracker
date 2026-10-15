@@ -707,7 +707,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             }
         )
 
-        val amount = amountEditText.text.toString().toDoubleOrNull() ?: 0.0
+        val amount = parseAmount(amountEditText.text.toString()) ?: 0.0
         val result = SplitCalculator.resolve(
             totalAmount = amount,
             participants = people,
@@ -747,7 +747,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         if (date > 0L) selectedTimestamp = date
         val account = intent.getStringExtra(EXTRA_TRANSACTION_ACCOUNT).orEmpty()
 
-        if (receivedAmount > 0.0) amountEditText.setText(receivedAmount.toString())
+        if (receivedAmount > 0.0) amountEditText.setText(formatAmount(receivedAmount))
         if (!receivedMerchant.isNullOrEmpty()) merchantEditText.setText(receivedMerchant)
         if (account.isNotBlank()) selectedAccount = account
         updateDateButtonText()
@@ -774,7 +774,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 db.transactionDao().getTransactionById(transactionId)
             }
             transactionToEdit?.let { tx ->
-                amountEditText.setText(tx.amount.toString())
+                amountEditText.setText(formatAmount(tx.amount))
                 merchantEditText.setText(tx.merchantName)
                 selectedAccount = tx.account
                 selectedType = MoneyManagerExporter.normalizeType(tx.transactionType)
@@ -956,6 +956,14 @@ class TransactionEntryActivity : AppCompatActivity() {
 
     private var saving = false
 
+    /** Accepts "1,250.00" as pasted from an SMS. */
+    private fun parseAmount(raw: String): Double? =
+        raw.replace(",", "").trim().toBigDecimalOrNull()?.toDouble()
+
+    /** Plain digits: Double.toString() shows ₹1 crore as "1.0E7". */
+    private fun formatAmount(amount: Double): String =
+        BigDecimal.valueOf(amount).stripTrailingZeros().toPlainString()
+
     private fun saveOrUpdateTransaction(markReviewed: Boolean) {
         val amountStr = amountEditText.text.toString()
         var merchant = merchantEditText.text.toString().trim()
@@ -966,7 +974,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         if (amountStr.isEmpty()) {
             amountEditText.error = "Required"; return
         }
-        val amount = amountStr.toDoubleOrNull()
+        val amount = parseAmount(amountStr)
         if (amount == null || amount <= 0) {
             amountEditText.error = "Invalid amount"; return
         }
@@ -1158,6 +1166,14 @@ class TransactionEntryActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun hasUnsavedSplitChanges(saved: Transaction): Boolean {
+        val uiAmount = parseAmount(amountEditText.text.toString())
+        return selectedSplitwiseGroupId != saved.splitwiseGroupId ||
+            selectedParticipants().joinToString(",") != saved.participants ||
+            SplitMode.normalize(selectedSplitMode) != SplitMode.normalize(saved.splitMode) ||
+            uiAmount == null || kotlin.math.abs(uiAmount - saved.amount) >= 0.005
+    }
+
     private fun pushCurrentToSplitwise() {
         if (currentTransactionId == INVALID_TRANSACTION_ID) {
             Toast.makeText(this, "Save the transaction first", Toast.LENGTH_SHORT).show()
@@ -1174,25 +1190,21 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
         buttonPushSplitwise.isEnabled = false
         lifecycleScope.launch {
+            val dao = db.transactionDao()
+            val saved = withContext(Dispatchers.IO) { dao.getTransactionById(currentTransactionId) }
+            // Push exactly what is saved: mixing the saved amount with unsaved people/group
+            // sent Splitwise a split nobody chose.
+            val unsaved = saved != null && hasUnsavedSplitChanges(saved)
             val result = withContext(Dispatchers.IO) {
-                val dao = db.transactionDao()
-                val latest = dao.getTransactionById(currentTransactionId)
-                    ?: return@withContext null to "Transaction missing"
+                val latest = saved ?: return@withContext null to "Transaction missing"
                 if (!ReviewStatus.canPushToSplitwise(latest.reviewStatus)) {
                     return@withContext null to getString(R.string.splitwise_push_needs_reviewed)
                 }
-                val withGroup = latest.copy(
-                    splitwiseGroupId = selectedSplitwiseGroupId,
-                    splitwiseParticipantIds = Transaction.encodeParticipantIds(selectedParticipantIdMap())
-                        .ifBlank { latest.splitwiseParticipantIds },
-                    participants = selectedParticipants().joinToString(",")
-                        .ifBlank { latest.participants }
-                )
-                if (withGroup != latest) {
-                    dao.updateTransaction(withGroup)
+                if (unsaved) {
+                    return@withContext null to getString(R.string.splitwise_save_before_push)
                 }
                 val push = SplitwisePusher.pushAndRecord(
-                    dao, SplitwiseApi.from(splitwiseStore), auth, withGroup
+                    dao, SplitwiseApi.from(splitwiseStore), auth, latest
                 )
                 push to null
             }

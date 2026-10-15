@@ -94,6 +94,28 @@ class MerchantMemoryAndRuleBuilderTest {
     }
 
     @Test
+    fun wizardRuleMatchesTheNextSmsNotJustTheSample() {
+        val sample = "Rs 250.00 debited from A/c XX1234 to SWIGGY on 12-Oct-26. Avl bal Rs 10,000.00"
+        val (rule, error) = SmsRuleBuilder.buildRule(
+            id = "user_next",
+            name = "Next",
+            sms = sample,
+            amountText = "250.00",
+            merchantText = "SWIGGY",
+            dateText = "12-Oct-26",
+            dateFormat = "dd-MMM-yy"
+        )
+        assertNull(error)
+        val next = SmsParser(AppConfig()).parseWithRulePublic(
+            "Rs 99.50 debited from A/c XX5678 to ZOMATO LTD on 13-Oct-26. Avl bal Rs 9,500.25",
+            rule!!
+        )
+        assertNotNull(next)
+        assertEquals(99.5, next!!.amount, 0.001)
+        assertEquals("ZOMATO LTD", next.merchantName)
+    }
+
+    @Test
     fun ruleBuilderRejectsMissingAmountInSms() {
         val sms = "Hello world paid something"
         val (rule, error) = SmsRuleBuilder.buildRule(

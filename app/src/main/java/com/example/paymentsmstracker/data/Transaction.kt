@@ -91,6 +91,13 @@ data class Transaction(
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
+    /** Mirrors the DAO's PENDING_SPLIT: exported, shared, not yet on Splitwise. Bulk deletes keep these. */
+    fun isPendingSplitwisePush(): Boolean =
+        reviewStatus == ReviewStatus.EXPORTED &&
+            splitwiseExpenseId == SplitwiseExpenseIds.PENDING &&
+            participants.isNotBlank() &&
+            !participants.trim().equals("ME", ignoreCase = true)
+
     fun participantIdMap(): Map<String, Long> = parseParticipantIds(splitwiseParticipantIds)
 
     companion object {
