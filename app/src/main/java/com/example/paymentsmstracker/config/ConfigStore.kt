@@ -12,11 +12,19 @@ class ConfigStore(context: Context) {
     fun load(): AppConfig {
         val json = prefs.getString(KEY_CONFIG, null) ?: return AppConfig()
         return try {
-            fromJson(JSONObject(json))
+            parse(json)
         } catch (_: Exception) {
+            // Keep the unreadable JSON so a later save of defaults never destroys it;
+            // Admin shows it in the JSON editor for the user to fix.
+            if (prefs.getString(KEY_UNREADABLE, null) == null) {
+                prefs.edit().putString(KEY_UNREADABLE, json).apply()
+            }
             AppConfig()
         }
     }
+
+    /** Raw config JSON that failed to parse, or null when the saved config is fine. */
+    fun unreadableJson(): String? = prefs.getString(KEY_UNREADABLE, null)
 
     fun save(config: AppConfig) {
         prefs.edit().putString(KEY_CONFIG, toJson(config).toString()).apply()
@@ -29,7 +37,8 @@ class ConfigStore(context: Context) {
     fun exportJson(): String = toJson(load()).toString(2)
 
     fun importJson(raw: String) {
-        save(fromJson(JSONObject(raw)))
+        save(parse(raw))
+        prefs.edit().remove(KEY_UNREADABLE).apply()
     }
 
     private fun toJson(config: AppConfig): JSONObject {
@@ -52,6 +61,7 @@ class ConfigStore(context: Context) {
             )
         }
         return JSONObject()
+            .put("configVersion", CONFIG_VERSION)
             .put("accounts", JSONArray(config.accounts))
             .put("incomeCategories", JSONArray(config.incomeCategories))
             .put("expenseCategories", categories)
@@ -67,94 +77,113 @@ class ConfigStore(context: Context) {
             .put("themeMode", config.themeMode)
     }
 
-    private fun fromJson(obj: JSONObject): AppConfig {
-        val loadedAccounts = obj.optJSONArray("accounts")?.toStringList()
-            ?: AppConfig.DEFAULT_ACCOUNTS
-        val existingAccountKeys = loadedAccounts.map { it.lowercase() }.toSet()
-        val accounts = loadedAccounts + AppConfig.DEFAULT_ACCOUNTS.filter {
-            it.lowercase() !in existingAccountKeys
-        }
-        val income = obj.optJSONArray("incomeCategories")?.toStringList()
-            ?: AppConfig.DEFAULT_INCOME_CATEGORIES
-
-        val categoriesObj = obj.optJSONObject("expenseCategories")
-        val categories = if (categoriesObj != null) {
-            buildMap {
-                categoriesObj.keys().forEach { key ->
-                    put(key, categoriesObj.optJSONArray(key)?.toStringList() ?: emptyList())
-                }
-            }
-        } else {
-            AppConfig.DEFAULT_EXPENSE_CATEGORIES
-        }
-
-        val rulesArray = obj.optJSONArray("smsParseRules")
-        val loadedRules = if (rulesArray != null && rulesArray.length() > 0) {
-            buildList {
-                for (i in 0 until rulesArray.length()) {
-                    val r = rulesArray.getJSONObject(i)
-                    add(
-                        SmsParseRule(
-                            id = r.optString("id", "rule_$i"),
-                            name = r.optString("name", "Rule $i"),
-                            enabled = r.optBoolean("enabled", true),
-                            pattern = r.getString("pattern"),
-                            dateFormat = r.optString("dateFormat", ""),
-                            defaultAccount = r.optString("defaultAccount", ""),
-                            isExpense = r.optBoolean("isExpense", true),
-                            isTransfer = r.optBoolean("isTransfer", false)
-                        )
-                    )
-                }
-            }
-        } else {
-            emptyList()
-        }
-        // Keep user rules, append new built-ins, and refresh known built-in date patterns.
-        val defaultsById = AppConfig.DEFAULT_SMS_RULES.associateBy { it.id }
-        val refreshedLoaded = loadedRules.map { loaded ->
-            val def = defaultsById[loaded.id] ?: return@map loaded
-            // Keep custom edits unless this is a known stock date/time capture we improved.
-            if (loaded.id == "hdfc_card_spend") {
-                loaded.copy(pattern = def.pattern, dateFormat = def.dateFormat)
-            } else {
-                loaded
-            }
-        }
-        val existingIds = refreshedLoaded.map { it.id }.toSet()
-        val rules = if (refreshedLoaded.isEmpty()) {
-            AppConfig.DEFAULT_SMS_RULES
-        } else {
-            refreshedLoaded + AppConfig.DEFAULT_SMS_RULES.filter { it.id !in existingIds }
-        }
-
-        return AppConfig(
-            accounts = accounts,
-            expenseCategories = categories,
-            incomeCategories = income,
-            debtCategory = obj.optString("debtCategory", "Social Life"),
-            debtSubcategory = obj.optString("debtSubcategory", "Dues"),
-            mmFullSplitAsOwnExpense = obj.optBoolean("mmFullSplitAsOwnExpense", false),
-            smsParseRules = rules,
-            dedupeWindowMinutes = obj.optInt("dedupeWindowMinutes", 30),
-            autoSaveFromSms = obj.optBoolean("autoSaveFromSms", true),
-            nightlyReviewReminderEnabled = obj.optBoolean("nightlyReviewReminderEnabled", true),
-            nightlyReviewHour = obj.optInt("nightlyReviewHour", 21).coerceIn(0, 23),
-            nightlyReviewMinute = obj.optInt("nightlyReviewMinute", 0).coerceIn(0, 59),
-            themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DYNAMIC))
-        )
-    }
-
-    private fun JSONArray.toStringList(): List<String> =
-        buildList {
-            for (i in 0 until length()) {
-                val value = optString(i).trim()
-                if (value.isNotEmpty()) add(value)
-            }
-        }
-
     companion object {
         private const val PREFS_NAME = "expense_tracker_config"
         private const val KEY_CONFIG = "app_config_json"
+        private const val KEY_UNREADABLE = "app_config_json_unreadable"
+
+        /**
+         * Bump when a release must merge new defaults into saved configs, and add a
+         * `version < N` block in [parse]. Merges run once: the next save stamps this version,
+         * so accounts/rules the user deleted afterwards stay deleted.
+         */
+        const val CONFIG_VERSION = 1
+
+        fun parse(raw: String): AppConfig = fromJson(JSONObject(raw))
+
+        private fun fromJson(obj: JSONObject): AppConfig {
+            val version = obj.optInt("configVersion", 0)
+            val loadedAccounts = obj.optJSONArray("accounts")?.toStringList()
+                ?: AppConfig.DEFAULT_ACCOUNTS
+            val accounts = if (version < 1) {
+                val existingAccountKeys = loadedAccounts.map { it.lowercase() }.toSet()
+                loadedAccounts + AppConfig.DEFAULT_ACCOUNTS.filter {
+                    it.lowercase() !in existingAccountKeys
+                }
+            } else {
+                loadedAccounts
+            }
+            val income = obj.optJSONArray("incomeCategories")?.toStringList()
+                ?: AppConfig.DEFAULT_INCOME_CATEGORIES
+
+            val categoriesObj = obj.optJSONObject("expenseCategories")
+            val categories = if (categoriesObj != null) {
+                buildMap {
+                    categoriesObj.keys().forEach { key ->
+                        put(key, categoriesObj.optJSONArray(key)?.toStringList() ?: emptyList())
+                    }
+                }
+            } else {
+                AppConfig.DEFAULT_EXPENSE_CATEGORIES
+            }
+
+            val rulesArray = obj.optJSONArray("smsParseRules")
+            val loadedRules = if (rulesArray != null && rulesArray.length() > 0) {
+                buildList {
+                    for (i in 0 until rulesArray.length()) {
+                        // Skip a broken rule instead of failing (and resetting) the whole config.
+                        val r = rulesArray.optJSONObject(i) ?: continue
+                        if (r.optString("pattern").isBlank()) continue
+                        add(
+                            SmsParseRule(
+                                id = r.optString("id", "rule_$i"),
+                                name = r.optString("name", "Rule $i"),
+                                enabled = r.optBoolean("enabled", true),
+                                pattern = r.getString("pattern"),
+                                dateFormat = r.optString("dateFormat", ""),
+                                defaultAccount = r.optString("defaultAccount", ""),
+                                isExpense = r.optBoolean("isExpense", true),
+                                isTransfer = r.optBoolean("isTransfer", false)
+                            )
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            }
+            val rules = when {
+                rulesArray == null -> AppConfig.DEFAULT_SMS_RULES
+                version < 1 && loadedRules.isEmpty() -> AppConfig.DEFAULT_SMS_RULES
+                version < 1 -> {
+                    // v0 → v1: append built-ins and refresh the improved HDFC date capture, once.
+                    val defaultsById = AppConfig.DEFAULT_SMS_RULES.associateBy { it.id }
+                    val refreshed = loadedRules.map { loaded ->
+                        val def = defaultsById[loaded.id]
+                        if (def != null && loaded.id == "hdfc_card_spend") {
+                            loaded.copy(pattern = def.pattern, dateFormat = def.dateFormat)
+                        } else {
+                            loaded
+                        }
+                    }
+                    val existingIds = refreshed.map { it.id }.toSet()
+                    refreshed + AppConfig.DEFAULT_SMS_RULES.filter { it.id !in existingIds }
+                }
+                else -> loadedRules
+            }
+
+            return AppConfig(
+                accounts = accounts,
+                expenseCategories = categories,
+                incomeCategories = income,
+                debtCategory = obj.optString("debtCategory", "Social Life"),
+                debtSubcategory = obj.optString("debtSubcategory", "Dues"),
+                mmFullSplitAsOwnExpense = obj.optBoolean("mmFullSplitAsOwnExpense", false),
+                smsParseRules = rules,
+                dedupeWindowMinutes = obj.optInt("dedupeWindowMinutes", 30),
+                autoSaveFromSms = obj.optBoolean("autoSaveFromSms", true),
+                nightlyReviewReminderEnabled = obj.optBoolean("nightlyReviewReminderEnabled", true),
+                nightlyReviewHour = obj.optInt("nightlyReviewHour", 21).coerceIn(0, 23),
+                nightlyReviewMinute = obj.optInt("nightlyReviewMinute", 0).coerceIn(0, 59),
+                themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DYNAMIC))
+            )
+        }
+
+        private fun JSONArray.toStringList(): List<String> =
+            buildList {
+                for (i in 0 until length()) {
+                    val value = optString(i).trim()
+                    if (value.isNotEmpty()) add(value)
+                }
+            }
     }
 }

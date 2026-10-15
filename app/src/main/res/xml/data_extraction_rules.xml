@@ -4,10 +4,17 @@
         <exclude domain="sharedpref" path="splitwise_auth.xml" />
         <exclude domain="sharedpref" path="splitwise_auth_secure.xml" />
         <exclude domain="sharedpref" path="agent_secure.xml" />
+        <!-- Ledger (full SMS text, location) and Splitwise WebView cookies stay on the phone. -->
+        <exclude domain="database" path="transaction_database" />
+        <exclude domain="database" path="transaction_database-wal" />
+        <exclude domain="database" path="transaction_database-shm" />
+        <exclude domain="root" path="app_webview/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="splitwise_auth.xml" />
         <exclude domain="sharedpref" path="splitwise_auth_secure.xml" />
         <exclude domain="sharedpref" path="agent_secure.xml" />
+        <!-- Phone-to-phone transfer is local and user-initiated: the ledger moves; cookies don't. -->
+        <exclude domain="root" path="app_webview/" />
     </device-transfer>
 </data-extraction-rules>

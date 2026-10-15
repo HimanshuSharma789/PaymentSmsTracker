@@ -203,6 +203,17 @@ interface TransactionDao {
     @Update
     suspend fun updateTransaction(transaction: Transaction)
 
+    /** Writes only the push outcome, so edits made while the network call ran are kept. */
+    @Query(
+        """
+        UPDATE transactions
+        SET splitwiseGroupId = :groupId, splitwiseExpenseId = :expenseId,
+            splitwisePushError = :error, lastUpdatedTimestamp = :now
+        WHERE id = :id
+        """
+    )
+    suspend fun recordSplitwisePush(id: Long, groupId: Long, expenseId: Long, error: String, now: Long)
+
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
 }

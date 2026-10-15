@@ -2,10 +2,14 @@ package com.example.paymentsmstracker.splitwise
 
 import com.example.paymentsmstracker.data.SplitwiseExpenseIds
 import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.data.TransactionDao
 import com.example.paymentsmstracker.export.SplitwiseExporter
 import com.example.paymentsmstracker.split.SplitCalculator
 import java.math.BigDecimal
 import java.math.RoundingMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 data class SplitwisePushResult(
     val transactionId: Long,
@@ -17,6 +21,31 @@ data class SplitwisePushResult(
 }
 
 object SplitwisePusher {
+
+    /** Tag put in every pushed expense's details so a retry can find an expense that was created
+     *  but whose response was lost (timeout, app killed), instead of creating it twice. */
+    fun marker(tx: Transaction): String = "[pst:${tx.id}]"
+
+    /**
+     * Push [tx] and record the outcome on its row. Runs to completion even if the calling screen
+     * is closed: a created-but-unrecorded expense would stay Pending and get pushed again.
+     */
+    suspend fun pushAndRecord(
+        dao: TransactionDao,
+        api: SplitwiseApi,
+        auth: SplitwiseAuthState,
+        tx: Transaction
+    ): SplitwisePushResult = withContext(NonCancellable + Dispatchers.IO) {
+        val result = pushOne(api, auth, tx)
+        val now = System.currentTimeMillis()
+        if (result.isSuccess) {
+            dao.recordSplitwisePush(tx.id, tx.splitwiseGroupId, result.expenseId!!, "", now)
+        } else {
+            val error = (result.error ?: "Push failed").take(240)
+            dao.recordSplitwisePush(tx.id, tx.splitwiseGroupId, tx.splitwiseExpenseId, error, now)
+        }
+        result
+    }
 
     fun pushOne(
         api: SplitwiseApi,
@@ -103,9 +132,18 @@ object SplitwisePusher {
                 if (isNotEmpty()) append(" · ")
                 append("Ref ${tx.referenceNumber}")
             }
-        }.ifBlank { null }
+            if (isNotEmpty()) append(" ")
+            append(marker(tx))
+        }
 
         return try {
+            // A previous attempt failed: it may have created the expense before the error
+            // (e.g. read timeout). Adopt that expense rather than creating a duplicate.
+            if (tx.splitwisePushError.isNotBlank()) {
+                api.findExpenseWithMarker(groupId, tx.timestamp, marker(tx))?.let {
+                    return SplitwisePushResult(tx.id, expenseId = it)
+                }
+            }
             val expenseId = api.createExpense(
                 groupId = groupId,
                 description = tx.merchantName.ifBlank { "Expense" },

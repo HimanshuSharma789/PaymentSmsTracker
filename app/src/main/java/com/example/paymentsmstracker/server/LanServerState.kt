@@ -1,8 +1,9 @@
 package com.example.paymentsmstracker.server
 
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.random.Random
 
 data class LanServerSnapshot(
     val running: Boolean = false,
@@ -28,6 +29,12 @@ data class LanServerSnapshot(
 object LanServerState {
     private val snapshot = AtomicReference(LanServerSnapshot())
     private val sessions = ConcurrentHashMap<String, Long>()
+    private val failedLogins = AtomicInteger(0)
+    private val random = SecureRandom()
+
+    /** A 6-digit code is guessable without a cap; after this many wrong codes every login
+     *  fails until the server is restarted (which issues a new code). */
+    const val MAX_FAILED_LOGINS = 5
 
     fun get(): LanServerSnapshot = snapshot.get()
 
@@ -40,6 +47,7 @@ object LanServerState {
     ) {
         val now = System.currentTimeMillis()
         sessions.clear()
+        failedLogins.set(0)
         snapshot.set(
             LanServerSnapshot(
                 running = true,
@@ -59,37 +67,47 @@ object LanServerState {
         snapshot.set(LanServerSnapshot())
     }
 
-    fun updateHost(host: String) {
-        snapshot.updateAndGet { it.copy(hostAddress = host) }
-    }
-
-    fun isAccessCodeValid(code: String): Boolean {
+    /** Running and not past its expiry. Checked per request: the service's stop timer
+     *  pauses while the phone sleeps, so it alone cannot enforce the window. */
+    fun isLive(nowMs: Long = System.currentTimeMillis()): Boolean {
         val current = snapshot.get()
-        if (!current.running) return false
-        if (!current.accessCodeRequired) return true
-        return code.trim() == current.accessCode
+        return current.running && nowMs <= current.expiresAtMs
     }
 
-    fun isOpenAccess(): Boolean {
+    /** Returns a session token for a correct code, or null (wrong code, locked out, or not live). */
+    fun login(code: String): String? {
+        if (!isLive()) return null
         val current = snapshot.get()
-        return current.running && !current.accessCodeRequired
-    }
-
-    fun createSession(): String {
-        val token = buildString {
-            repeat(32) { append("abcdefghijklmnopqrstuvwxyz0123456789"[Random.nextInt(36)]) }
+        if (current.accessCodeRequired) {
+            if (failedLogins.get() >= MAX_FAILED_LOGINS) return null
+            val ok = java.security.MessageDigest.isEqual(
+                code.trim().toByteArray(),
+                current.accessCode.toByteArray()
+            )
+            if (!ok) {
+                failedLogins.incrementAndGet()
+                return null
+            }
         }
+        val token = ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
         sessions[token] = System.currentTimeMillis()
         return token
     }
 
+    fun isLockedOut(): Boolean = failedLogins.get() >= MAX_FAILED_LOGINS
+
+    fun isOpenAccess(): Boolean = isLive() && !snapshot.get().accessCodeRequired
+
     fun isSessionValid(token: String?): Boolean {
         if (token.isNullOrBlank()) return false
-        val current = snapshot.get()
-        if (!current.running) return false
-        return sessions.containsKey(token)
+        return isLive() && sessions.containsKey(token)
     }
 
-    fun generateAccessCode(): String =
-        Random.nextInt(100000, 1000000).toString()
+    /** The only Host header a browser on the LAN should send; anything else is DNS rebinding. */
+    fun isExpectedHost(hostHeader: String?): Boolean {
+        val current = snapshot.get()
+        return hostHeader != null && hostHeader == "${current.hostAddress}:${current.port}"
+    }
+
+    fun generateAccessCode(): String = (100000 + random.nextInt(900000)).toString()
 }

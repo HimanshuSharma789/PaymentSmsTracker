@@ -229,7 +229,10 @@ object SplitCalculator {
         return Intermediate(adjustRounding(raw, people, total))
     }
 
-    /** Assign any leftover paisa to the first participant so shares sum exactly. */
+    /**
+     * Assign any leftover paisa to ME (else the first participant) so shares sum exactly.
+     * If that would push ME below zero (e.g. ME at 0%), the largest share absorbs it instead.
+     */
     private fun adjustRounding(
         shares: Map<String, BigDecimal>,
         people: List<String>,
@@ -239,8 +242,13 @@ object SplitCalculator {
         val sum = mutable.values.fold(BigDecimal.ZERO) { a, b -> a.add(b) }
         val diff = total.subtract(sum)
         if (diff.compareTo(BigDecimal.ZERO) != 0) {
-            val target = people.firstOrNull { it.equals("ME", ignoreCase = true) }
+            val preferred = people.firstOrNull { it.equals("ME", ignoreCase = true) }
                 ?: people.first()
+            val target = if ((mutable[preferred] ?: BigDecimal.ZERO).add(diff) >= BigDecimal.ZERO) {
+                preferred
+            } else {
+                mutable.maxBy { it.value }.key
+            }
             mutable[target] = (mutable[target] ?: BigDecimal.ZERO).add(diff)
                 .setScale(2, RoundingMode.HALF_UP)
         }

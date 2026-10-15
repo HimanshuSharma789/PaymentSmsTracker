@@ -26,6 +26,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -332,6 +333,8 @@ class SplitsActivity : AppCompatActivity() {
         }
     }
 
+    private var pushJob: Job? = null
+
     private fun pushSelected(ids: Set<Long>) {
         val store = SplitwiseAuthStore(this)
         val auth = store.load()
@@ -339,8 +342,10 @@ class SplitsActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.splitwise_not_connected, Toast.LENGTH_LONG).show()
             return
         }
+        // One push at a time: the menu item and the button both lead here.
+        if (pushJob?.isActive == true) return
         pushButton.isEnabled = false
-        lifecycleScope.launch {
+        pushJob = lifecycleScope.launch {
             val message = withContext(Dispatchers.IO) {
                 val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
                 val txs = dao.getPendingSplitTransactionsList().filter { it.id in ids }
@@ -358,26 +363,11 @@ class SplitsActivity : AppCompatActivity() {
                     } else {
                         tx
                     }
-                    val result = SplitwisePusher.pushOne(api, auth, prepared)
-                    if (result.isSuccess && result.expenseId != null) {
-                        dao.updateTransaction(
-                            prepared.copy(
-                                splitwiseGroupId = prepared.splitwiseGroupId,
-                                splitwiseExpenseId = result.expenseId,
-                                splitwisePushError = "",
-                                lastUpdatedTimestamp = System.currentTimeMillis()
-                            )
-                        )
+                    val result = SplitwisePusher.pushAndRecord(dao, api, auth, prepared)
+                    if (result.isSuccess) {
                         ok++
                     } else {
                         failed++
-                        dao.updateTransaction(
-                            prepared.copy(
-                                splitwiseGroupId = prepared.splitwiseGroupId,
-                                splitwisePushError = (result.error ?: "Push failed").take(240),
-                                lastUpdatedTimestamp = System.currentTimeMillis()
-                            )
-                        )
                         if (result.unauthorized) {
                             return@withContext "SESSION_EXPIRED"
                         }

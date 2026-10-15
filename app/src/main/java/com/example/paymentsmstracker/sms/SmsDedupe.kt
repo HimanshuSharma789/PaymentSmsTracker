@@ -9,7 +9,7 @@ import kotlin.math.abs
 /**
  * Duplicate rules:
  * 1. Identical SMS body → duplicate
- * 2. Same non-blank bank reference → duplicate
+ * 2. Same bank reference (6+ chars) → duplicate
  * 3. If the new SMS has a reference and it is new → keep it (even if amount/merchant match)
  * 4. Only when reference is missing: amount + merchant within the dedupe window → duplicate
  */
@@ -24,7 +24,7 @@ object SmsDedupe {
     ): Boolean {
         if (dao.findByOriginalSms(messageBody) != null) return true
 
-        val ref = parsed.referenceNumber?.trim().orEmpty()
+        val ref = usableReference(parsed)
         if (ref.isNotEmpty()) {
             return dao.findByReference(ref) != null
         }
@@ -44,7 +44,7 @@ object SmsDedupe {
             return true
         }
 
-        val reference = parsed.referenceNumber?.trim().orEmpty()
+        val reference = usableReference(parsed)
         if (reference.isNotEmpty()) {
             return existing.any {
                 it.referenceNumber?.trim()?.equals(reference, ignoreCase = true) == true
@@ -59,9 +59,14 @@ object SmsDedupe {
         }
     }
 
+    /** Bank references are long; a short one ("No", "und") is a mis-capture and must not dedupe. */
+    fun usableReference(parsed: ParsedSms): String =
+        parsed.referenceNumber?.trim()?.takeIf { it.length >= MIN_REFERENCE_LENGTH }.orEmpty()
+
+    private const val MIN_REFERENCE_LENGTH = 6
+
     fun normalizeSms(value: String): String =
         value.trim().replace(Regex("\\s+"), " ").lowercase(Locale.ENGLISH)
 
-    fun normalizeMerchant(value: String): String =
-        value.trim().replace(Regex("\\s+"), " ").lowercase(Locale.ENGLISH)
+    fun normalizeMerchant(value: String): String = normalizeSms(value)
 }

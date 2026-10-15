@@ -23,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
@@ -783,6 +784,8 @@ class TransactionEntryActivity : AppCompatActivity() {
                 selectedTimestamp = tx.timestamp
                 selectedSplitMode = SplitMode.normalize(tx.splitMode)
                 currentReviewStatus = tx.reviewStatus
+                // Exported rows can only be saved as exported; a "draft" would re-export them.
+                saveDraftButton.isVisible = tx.reviewStatus != ReviewStatus.EXPORTED
                 selectedSplitwiseGroupId = tx.splitwiseGroupId.takeIf { it > 0L }
                     ?: splitwiseStore.load().defaultGroupId
                 selectedSplitwiseExpenseId = tx.splitwiseExpenseId
@@ -951,6 +954,8 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
     }
 
+    private var saving = false
+
     private fun saveOrUpdateTransaction(markReviewed: Boolean) {
         val amountStr = amountEditText.text.toString()
         var merchant = merchantEditText.text.toString().trim()
@@ -1012,12 +1017,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             }
         }
 
-        val previous = transactionToEdit?.reviewStatus
-        val status = when {
-            markReviewed && previous == ReviewStatus.EXPORTED -> ReviewStatus.EXPORTED
-            markReviewed -> ReviewStatus.REVIEWED
-            else -> ReviewStatus.NEEDS_REVIEW
-        }
+        val status = ReviewStatus.afterSave(transactionToEdit?.reviewStatus, markReviewed)
         val idMap = if (transfer || participants.isEmpty()) {
             emptyMap()
         } else {
@@ -1053,6 +1053,11 @@ class TransactionEntryActivity : AppCompatActivity() {
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
 
+        // A double tap would otherwise insert the same new transaction twice.
+        if (saving) return
+        saving = true
+        saveButton.isEnabled = false
+        saveDraftButton.isEnabled = false
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) {
@@ -1074,16 +1079,19 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
                 Toast.makeText(
                     this@TransactionEntryActivity,
-                    if (markReviewed) {
-                        if (status == ReviewStatus.EXPORTED) "Saved (exported)" else "Marked reviewed"
-                    } else {
-                        "Saved draft"
+                    when {
+                        status == ReviewStatus.EXPORTED -> "Saved (exported)"
+                        markReviewed -> "Marked reviewed"
+                        else -> "Saved draft"
                     },
                     Toast.LENGTH_SHORT
                 ).show()
                 finish()
             } catch (e: Exception) {
                 Log.e("TransactionEntry", "Save failed", e)
+                saving = false
+                saveButton.isEnabled = true
+                saveDraftButton.isEnabled = true
                 Toast.makeText(this@TransactionEntryActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
@@ -1183,23 +1191,9 @@ class TransactionEntryActivity : AppCompatActivity() {
                 if (withGroup != latest) {
                     dao.updateTransaction(withGroup)
                 }
-                val push = SplitwisePusher.pushOne(SplitwiseApi.from(splitwiseStore), auth, withGroup)
-                if (push.isSuccess && push.expenseId != null) {
-                    dao.updateTransaction(
-                        withGroup.copy(
-                            splitwiseExpenseId = push.expenseId,
-                            splitwisePushError = "",
-                            lastUpdatedTimestamp = System.currentTimeMillis()
-                        )
-                    )
-                } else if (!push.isSuccess) {
-                    dao.updateTransaction(
-                        withGroup.copy(
-                            splitwisePushError = (push.error ?: "Push failed").take(240),
-                            lastUpdatedTimestamp = System.currentTimeMillis()
-                        )
-                    )
-                }
+                val push = SplitwisePusher.pushAndRecord(
+                    dao, SplitwiseApi.from(splitwiseStore), auth, withGroup
+                )
                 push to null
             }
             val (push, missing) = result

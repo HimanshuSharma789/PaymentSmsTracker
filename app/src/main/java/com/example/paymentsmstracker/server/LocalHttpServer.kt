@@ -13,6 +13,8 @@ import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.contentLength
+import io.ktor.server.request.contentType
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondBytes
@@ -36,16 +38,17 @@ class LocalHttpServer(private val appContext: Context) {
         splitwiseStore = com.example.paymentsmstracker.splitwise.SplitwiseAuthStore(appContext)
     )
 
-    fun start(preferredPort: Int = 0): Int {
+    /** Binds to [host] (the Wi-Fi address) only, not hotspot/VPN/cellular interfaces. */
+    fun start(host: String, preferredPort: Int = 0): Int {
         stop()
         val port = if (preferredPort > 0) preferredPort else findFreePort()
-        val server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+        val server = embeddedServer(CIO, port = port, host = host) {
             install(StatusPages) {
                 exception<Throwable> { call, cause ->
                     Log.e(TAG, "Request failed", cause)
                     call.respondJson(
                         HttpStatusCode.InternalServerError,
-                        JSONObject().put("error", cause.message ?: "Server error")
+                        JSONObject().put("error", "Server error")
                     )
                 }
             }
@@ -74,19 +77,28 @@ class LocalHttpServer(private val appContext: Context) {
                 }
 
                 get("/api/status") {
+                    if (!requireExpectedHost(call)) return@get
                     call.respondJson(HttpStatusCode.OK, api.statusJson())
                 }
                 post("/api/login") {
-                    val body = runCatching { JSONObject(call.receiveText()) }.getOrNull()
-                    val code = body?.optString("code").orEmpty()
-                    if (!LanServerState.isAccessCodeValid(code)) {
+                    if (!requireExpectedHost(call)) return@post
+                    val body = parseBody(call) ?: return@post
+                    val token = LanServerState.login(body.optString("code"))
+                    if (token == null) {
+                        val locked = LanServerState.isLockedOut()
                         call.respondJson(
-                            HttpStatusCode.Unauthorized,
-                            JSONObject().put("error", "Invalid access code")
+                            if (locked) HttpStatusCode.TooManyRequests else HttpStatusCode.Unauthorized,
+                            JSONObject().put(
+                                "error",
+                                if (locked) {
+                                    "Too many wrong codes. Restart LAN access on the phone for a new code."
+                                } else {
+                                    "Invalid access code"
+                                }
+                            )
                         )
                         return@post
                     }
-                    val token = LanServerState.createSession()
                     call.respondJson(
                         HttpStatusCode.OK,
                         JSONObject().put("token", token).put("status", api.statusJson())
@@ -197,12 +209,37 @@ class LocalHttpServer(private val appContext: Context) {
         val bytes = withContext(Dispatchers.IO) {
             appContext.assets.open(path).use { it.readBytes() }
         }
+        if (type == ContentType.Text.Html) {
+            // Only our own scripts run, even if some ledger text slips past escaping.
+            response.headers.append(
+                "Content-Security-Policy",
+                "default-src 'self'; object-src 'none'; frame-ancestors 'none'"
+            )
+        }
         respondBytes(bytes, type)
     }
 
+    /**
+     * JSON bodies only: a cross-site page can POST text/plain without a CORS preflight,
+     * but not application/json. Bodies are capped; the web UI never sends more than a few KB.
+     */
     private suspend fun parseBody(call: ApplicationCall): JSONObject? {
+        if (call.request.contentType().withoutParameters() != ContentType.Application.Json) {
+            call.respondJson(
+                HttpStatusCode.UnsupportedMediaType,
+                JSONObject().put("error", "Content-Type must be application/json")
+            )
+            return null
+        }
+        if ((call.request.contentLength() ?: 0L) > MAX_BODY_BYTES) {
+            call.respondJson(
+                HttpStatusCode.PayloadTooLarge,
+                JSONObject().put("error", "Request too large")
+            )
+            return null
+        }
         return try {
-            JSONObject(call.receiveText())
+            JSONObject(call.receiveText().take(MAX_BODY_BYTES.toInt()))
         } catch (_: Exception) {
             call.respondJson(
                 HttpStatusCode.BadRequest,
@@ -212,7 +249,14 @@ class LocalHttpServer(private val appContext: Context) {
         }
     }
 
+    private suspend fun requireExpectedHost(call: ApplicationCall): Boolean {
+        if (LanServerState.isExpectedHost(call.request.header(HttpHeaders.Host))) return true
+        call.respondJson(HttpStatusCode.Forbidden, JSONObject().put("error", "Unexpected host"))
+        return false
+    }
+
     private suspend fun requireAuth(call: ApplicationCall): Boolean {
+        if (!requireExpectedHost(call)) return false
         if (LanServerState.isOpenAccess()) return true
         val header = call.request.header(HttpHeaders.Authorization).orEmpty()
         val token = header.removePrefix("Bearer").trim()
@@ -234,5 +278,6 @@ class LocalHttpServer(private val appContext: Context) {
 
     companion object {
         private const val TAG = "LocalHttpServer"
+        private const val MAX_BODY_BYTES = 256 * 1024L
     }
 }

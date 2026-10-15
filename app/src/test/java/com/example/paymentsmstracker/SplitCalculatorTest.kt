@@ -415,6 +415,40 @@ class SplitCalculatorTest {
         assertEquals(bd("5.00"), resolved.amounts["Puneet"])
     }
 
+    @Test
+    fun sharesAreNeverNegativeAndAlwaysSumToTotal() {
+        // The reported case: ME at 0%, two friends round up → ME used to get -0.01.
+        val zeroMe = SplitCalculator.resolve(
+            100.05, listOf("ME", "A", "B"), SplitMode.PERCENT,
+            mapOf("ME" to bd("0"), "A" to bd("50"), "B" to bd("50"))
+        )
+        assertEquals(bd("0.00"), zeroMe.myShare)
+        assertEquals(bd("100.05"), sum(zeroMe.amounts))
+
+        val rnd = java.util.Random(42)
+        repeat(2000) {
+            val total = (1 + rnd.nextInt(1_000_000)) / 100.0
+            val people = listOf("ME", "A", "B", "C").take(2 + rnd.nextInt(3))
+            val pctMe = rnd.nextInt(101)
+            val pcts = people.mapIndexed { i, p ->
+                p to BigDecimal(if (i == 0) pctMe else 0)
+            }.toMap().toMutableMap()
+            // Spread the remaining percent over friends.
+            var left = 100 - pctMe
+            people.drop(1).forEachIndexed { i, p ->
+                val v = if (i == people.size - 2) left else rnd.nextInt(left + 1)
+                pcts[p] = BigDecimal(v); left -= v
+            }
+            val weights = people.associateWith { BigDecimal(1 + rnd.nextInt(50)) }
+            for ((mode, inputs) in listOf(SplitMode.PERCENT to pcts, SplitMode.WEIGHT to weights, SplitMode.EQUAL to emptyMap())) {
+                val r = SplitCalculator.resolve(total, people, mode, inputs)
+                assertTrue("$mode $total $inputs", r.isValid)
+                assertTrue("$mode $total $inputs ${r.amounts}", r.amounts.values.all { it >= BigDecimal.ZERO })
+                assertEquals("$mode $total $inputs", BigDecimal.valueOf(total).setScale(2), sum(r.amounts))
+            }
+        }
+    }
+
     private fun bd(value: String): BigDecimal = BigDecimal(value).setScale(2)
 
     private fun sum(map: Map<String, BigDecimal>): BigDecimal =
