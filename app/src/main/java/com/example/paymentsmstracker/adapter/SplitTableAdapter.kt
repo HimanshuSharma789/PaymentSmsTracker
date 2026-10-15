@@ -194,16 +194,9 @@ class SplitTableAdapter(
         fun fromTransaction(tx: Transaction): SplitRowUi {
             val people = tx.participantList()
             val total = BigDecimal.valueOf(tx.amount).setScale(2, RoundingMode.HALF_UP)
-            val split = SplitCalculator.resolve(tx)
-            val myShare = if (split.isValid) {
-                split.myShare
-            } else if (people.isEmpty()) {
-                total
-            } else {
-                val share = total.divide(BigDecimal(people.size), 2, RoundingMode.HALF_UP)
-                if (people.any { it.equals("ME", true) }) share else BigDecimal.ZERO.setScale(2)
-            }
-            val friends = if (split.isValid) split.friendsOwe else total.subtract(myShare)
+            val split = SplitCalculator.resolveOrEqual(tx)
+            val myShare = split.myShare
+            val friends = split.friendsOwe
             val date = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tx.timestamp))
             val modeLabel = SplitMode.label(tx.splitMode)
             val peopleLabel = buildString {

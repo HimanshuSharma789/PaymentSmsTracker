@@ -29,7 +29,7 @@ import com.example.paymentsmstracker.reminder.NightlyReviewScheduler
 import com.example.paymentsmstracker.server.LanAccessService
 import com.example.paymentsmstracker.server.LanServerState
 import com.example.paymentsmstracker.server.NetworkUtils
-import com.example.paymentsmstracker.sms.SmsDedupe
+import com.example.paymentsmstracker.sms.SmsIngest
 import com.example.paymentsmstracker.sms.SmsParser
 import com.example.paymentsmstracker.splitwise.SplitwiseApi
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthMethod
@@ -677,8 +677,23 @@ class AdminActivity : AppCompatActivity() {
         updateLanWarningText(state.accessCodeRequired)
     }
 
+    /** JSON last put in the editor; if the editor still shows it, the user hasn't edited it. */
+    private var boundConfigJson: String? = null
+
+    private fun setConfigJson(json: String) {
+        boundConfigJson = json
+        editConfigJson.setText(json)
+    }
+
     override fun onResume() {
         super.onResume()
+        // Another screen (rule wizard) may have saved config; refresh an unedited editor so a
+        // later "Save rules" doesn't write the stale JSON back over it.
+        if (::editConfigJson.isInitialized && editConfigJson.text?.toString() == boundConfigJson &&
+            configStore.unreadableJson() == null
+        ) {
+            setConfigJson(configStore.exportJson())
+        }
         if (::splitwiseStore.isInitialized) {
             bindSplitwiseUi()
         }
@@ -710,7 +725,7 @@ class AdminActivity : AppCompatActivity() {
         refreshNightlyTimeLabel()
         refreshBackfillDateLabels()
         val unreadable = configStore.unreadableJson()
-        editConfigJson.setText(unreadable ?: configStore.exportJson())
+        setConfigJson(unreadable ?: configStore.exportJson())
         if (unreadable != null) {
             Toast.makeText(
                 this,
@@ -754,7 +769,7 @@ class AdminActivity : AppCompatActivity() {
         val mode = selectedThemeMode()
         val current = configStore.load()
         configStore.save(current.copy(themeMode = mode))
-        editConfigJson.setText(configStore.exportJson())
+        setConfigJson(configStore.exportJson())
         ThemeApplier.applyFromConfig(this)
         Toast.makeText(this, R.string.save_theme, Toast.LENGTH_SHORT).show()
         recreate()
@@ -823,7 +838,7 @@ class AdminActivity : AppCompatActivity() {
                     nightlyReviewMinute = nightlyMinute.coerceIn(0, 59)
                 )
             )
-            editConfigJson.setText(configStore.exportJson())
+            setConfigJson(configStore.exportJson())
             NightlyReviewScheduler.applyFromConfig(this)
             Toast.makeText(this, "Basics saved", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -881,38 +896,27 @@ class AdminActivity : AppCompatActivity() {
             Toast.makeText(this, "Paste an SMS first", Toast.LENGTH_SHORT).show()
             return
         }
-        val parsed = SmsParser(configStore.load()).parse(sms)
-        if (parsed == null) {
-            textParseResult.text = "No match — fix regex or SMS text before injecting."
-            Toast.makeText(this, "Parse failed", Toast.LENGTH_SHORT).show()
-            return
-        }
         lifecycleScope.launch {
-            val id = withContext(Dispatchers.IO) {
-                val db = AppDatabase.getDatabase(applicationContext)
-                val hint = MerchantMemory.lookup(db, parsed.merchantName)
-                val filled = MerchantMemory.applyToBlankFields(
-                    category = "",
-                    subcategory = "",
-                    account = parsed.account,
-                    transactionType = parsed.transactionType,
-                    hint = hint
+            val outcome = withContext(Dispatchers.IO) {
+                SmsIngest.ingest(
+                    db = AppDatabase.getDatabase(applicationContext),
+                    config = configStore.load(),
+                    body = sms,
+                    receivedAtMs = null,
+                    sender = null
                 )
-                db.transactionDao().insertTransaction(
-                    Transaction(
-                        amount = parsed.amount,
-                        merchantName = parsed.merchantName,
-                        category = filled.category,
-                        subcategory = filled.subcategory,
-                        account = filled.account,
-                        timestamp = parsed.timestamp,
-                        originalSms = sms,
-                        isExpense = parsed.isExpense,
-                        referenceNumber = parsed.referenceNumber,
-                        reviewStatus = ReviewStatus.NEEDS_REVIEW,
-                        transactionType = parsed.transactionType
-                    )
-                )
+            }
+            val id = when (outcome) {
+                is SmsIngest.Outcome.Accepted -> outcome.id
+                is SmsIngest.Outcome.Duplicate -> {
+                    Toast.makeText(this@AdminActivity, "Already in the list (duplicate)", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                else -> {
+                    textParseResult.text = "No match — fix regex or SMS text before injecting."
+                    Toast.makeText(this@AdminActivity, "Parse failed", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
             }
             textParseResult.text = "Injected as Needs review (id=$id)\n\n" + textParseResult.text
             Toast.makeText(this@AdminActivity, "Saved to review list", Toast.LENGTH_SHORT).show()
@@ -939,7 +943,7 @@ class AdminActivity : AppCompatActivity() {
             val body = txs.joinToString("\n") { tx ->
                 listOf(
                     tx.id.toString(),
-                    tx.amount.toString(),
+                    java.math.BigDecimal.valueOf(tx.amount).toPlainString(),
                     q(tx.merchantName),
                     q(tx.account),
                     q(tx.category),
@@ -953,12 +957,7 @@ class AdminActivity : AppCompatActivity() {
                     q(tx.originalSms.orEmpty())
                 ).joinToString(",")
             }
-            FileHandler().saveCsvFileToDownloads(
-                this@AdminActivity,
-                "transactions_raw_$stamp.csv",
-                header + body
-            )
-            Toast.makeText(this@AdminActivity, "Exported raw CSV", Toast.LENGTH_LONG).show()
+            FileHandler().exportCsv(this@AdminActivity, "transactions_raw_$stamp.csv", header + body)
         }
     }
 
@@ -995,9 +994,7 @@ class AdminActivity : AppCompatActivity() {
                 return@launch
             }
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "splitwise_import_$stamp.csv"
-            FileHandler().saveCsvFileToDownloads(this@AdminActivity, fileName, csv)
-            Toast.makeText(this@AdminActivity, "Exported → $fileName", Toast.LENGTH_LONG).show()
+            FileHandler().exportCsv(this@AdminActivity, "splitwise_import_$stamp.csv", csv)
         }
     }
 
@@ -1012,9 +1009,7 @@ class AdminActivity : AppCompatActivity() {
                 return@launch
             }
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "split_ledger_$stamp.csv"
-            FileHandler().saveCsvFileToDownloads(this@AdminActivity, fileName, csv)
-            Toast.makeText(this@AdminActivity, "Exported → $fileName", Toast.LENGTH_LONG).show()
+            FileHandler().exportCsv(this@AdminActivity, "split_ledger_$stamp.csv", csv)
         }
     }
 
@@ -1116,7 +1111,6 @@ class AdminActivity : AppCompatActivity() {
     ): BackfillResult {
         val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
         val config = configStore.load()
-        val parser = SmsParser(config)
         val existing = dao.getAllTransactionsList().toMutableList()
         var scanned = 0
         var parsedCount = 0
@@ -1145,56 +1139,38 @@ class AdminActivity : AppCompatActivity() {
             val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
             val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
 
+            val db = AppDatabase.getDatabase(applicationContext)
             while (cursor.moveToNext()) {
                 val sender = cursor.getString(addressIndex).orEmpty()
-                if (!isKnownBankSender(sender)) continue
+                if (!config.isBankSender(sender)) continue
 
                 scanned++
                 val body = cursor.getString(bodyIndex).orEmpty()
                 if (body.isBlank()) continue
-                val inboxDate = cursor.getLong(dateIndex)
-                val parsed = parser.parse(body, receivedAtMs = inboxDate) ?: continue
-                parsedCount++
-
-                if (SmsDedupe.isDuplicateAgainst(existing, body, parsed, config.dedupeWindowMinutes)) {
-                    duplicates++
-                    continue
+                val outcome = SmsIngest.ingest(
+                    db = db,
+                    config = config,
+                    body = body,
+                    receivedAtMs = cursor.getLong(dateIndex),
+                    sender = sender,
+                    existing = existing
+                )
+                when (outcome) {
+                    is SmsIngest.Outcome.Accepted -> {
+                        parsedCount++
+                        inserted++
+                        existing.add(outcome.transaction)
+                    }
+                    is SmsIngest.Outcome.Duplicate -> {
+                        parsedCount++
+                        duplicates++
+                    }
+                    else -> Unit
                 }
-
-                val db = AppDatabase.getDatabase(applicationContext)
-                val hint = MerchantMemory.lookup(db, parsed.merchantName)
-                val filled = MerchantMemory.applyToBlankFields(
-                    category = "",
-                    subcategory = "",
-                    account = parsed.account,
-                    transactionType = parsed.transactionType,
-                    hint = hint
-                )
-                val transaction = Transaction(
-                    amount = parsed.amount,
-                    merchantName = parsed.merchantName,
-                    category = filled.category,
-                    subcategory = filled.subcategory,
-                    account = filled.account,
-                    timestamp = parsed.timestamp,
-                    originalSms = body,
-                    isExpense = parsed.isExpense,
-                    referenceNumber = parsed.referenceNumber,
-                    reviewStatus = ReviewStatus.NEEDS_REVIEW,
-                    transactionType = parsed.transactionType
-                )
-                val id = dao.insertTransaction(transaction)
-                existing.add(transaction.copy(id = id))
-                inserted++
             }
         }
 
         return BackfillResult(scanned, parsedCount, inserted, duplicates)
-    }
-
-    private fun isKnownBankSender(address: String): Boolean {
-        val normalized = address.uppercase(Locale.ENGLISH)
-        return KNOWN_BANK_SENDER_TOKENS.any { normalized.contains(it) }
     }
 
     private fun startOfDay(millis: Long): Long =
@@ -1212,7 +1188,7 @@ class AdminActivity : AppCompatActivity() {
                 AppDatabase.getDatabase(applicationContext)
                     .transactionDao()
                     .getTransactionsByStatusList(status)
-                    .size
+                    .count { !it.isPendingSplitwisePush() }
             }
             if (count == 0) {
                 Toast.makeText(this@AdminActivity, "No $label transactions", Toast.LENGTH_SHORT).show()
@@ -1220,7 +1196,14 @@ class AdminActivity : AppCompatActivity() {
             }
             AlertDialog.Builder(this@AdminActivity)
                 .setTitle("$label?")
-                .setMessage("Delete $count transactions? This cannot be undone.")
+                .setMessage(
+                    "Delete $count transactions? This cannot be undone." +
+                        if (status == ReviewStatus.EXPORTED) {
+                            "\n\nSplits still waiting to be pushed to Splitwise are kept."
+                        } else {
+                            ""
+                        }
+                )
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(R.string.delete) { _, _ ->
                     lifecycleScope.launch {
@@ -1247,7 +1230,7 @@ class AdminActivity : AppCompatActivity() {
                 AppDatabase.getDatabase(applicationContext)
                     .transactionDao()
                     .getTransactionsByStatusList(ReviewStatus.EXPORTED)
-                    .count { it.lastUpdatedTimestamp < cutoff }
+                    .count { it.lastUpdatedTimestamp < cutoff && !it.isPendingSplitwisePush() }
             }
             if (count == 0) {
                 Toast.makeText(
@@ -1325,30 +1308,4 @@ class AdminActivity : AppCompatActivity() {
         val inserted: Int,
         val duplicates: Int
     )
-
-    companion object {
-        private val KNOWN_BANK_SENDER_TOKENS = listOf(
-            "SBI",
-            "HDFC",
-            "HSBC",
-            "ICICI",
-            "AXIS",
-            "KOTAK",
-            "IDFC",
-            "YESBANK",
-            "INDUSIND",
-            "PNB",
-            "CANBK",
-            "BOI",
-            "UNION",
-            "PAYTM",
-            "AIRTEL",
-            // Airtel Payments Bank often uses AX-AIRBNK / AD-AIRBNK (not "AIRTEL")
-            "AIRBNK",
-            "AIRTELBANK",
-            "PHONEPE",
-            "GOOGLEPAY",
-            "AMAZONPAY"
-        )
-    }
 }

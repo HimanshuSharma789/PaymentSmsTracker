@@ -327,9 +327,7 @@ class SplitsActivity : AppCompatActivity() {
             }
             val csv = SplitwiseExporter.toCsv(txs, onlySplits = true)
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "splitwise_import_$stamp.csv"
-            FileHandler().saveCsvFileToDownloads(this@SplitsActivity, fileName, csv)
-            Toast.makeText(this@SplitsActivity, "Exported → $fileName", Toast.LENGTH_LONG).show()
+            FileHandler().exportCsv(this@SplitsActivity, "splitwise_import_$stamp.csv", csv)
         }
     }
 

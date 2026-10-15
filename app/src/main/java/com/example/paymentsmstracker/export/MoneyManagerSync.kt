@@ -31,6 +31,19 @@ object MoneyManagerSync {
         transactionDao: TransactionDao,
         markExported: Boolean
     ): SyncOutcome? {
+        // A split whose shares no longer add up would reach MM as numbers the user never chose
+        // (and Splitwise would refuse the same row). Leave those in Reviewed to fix first.
+        val blocked = transactions.filter { MoneyManagerExporter.exportBlocker(it, config) != null }
+        if (blocked.isNotEmpty()) {
+            android.widget.Toast.makeText(
+                activity,
+                "${blocked.size} transaction(s) skipped: fix their split first " +
+                    "(${blocked.first().merchantName}: ${MoneyManagerExporter.exportBlocker(blocked.first(), config)})",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+        @Suppress("NAME_SHADOWING")
+        val transactions = transactions - blocked.toSet()
         if (transactions.isEmpty()) {
             return null
         }

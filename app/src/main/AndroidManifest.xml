@@ -84,7 +84,10 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".TransactionEntryActivity" />
+        <!-- Handle rotation in place: a recreate dropped half-typed form state (no layout-land exists). -->
+        <activity
+            android:name=".TransactionEntryActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <activity android:name=".TransactionListActivity" />
         <activity android:name=".SplitsActivity" />
         <activity
@@ -93,6 +96,7 @@
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".AdminActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="false"
             android:launchMode="singleTop" />
         <activity

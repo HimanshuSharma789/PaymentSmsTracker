@@ -31,6 +31,12 @@ This review is read-only. Nothing in the code was changed. Paths are relative to
 
 ## P1: wrong data, misleading UI
 
+**Status (2026-10-16): fixed.**
+- One ingest path: `sms/SmsIngest.kt`.
+- Bank senders are configurable in config JSON (`bankSenderTokens`; empty = accept all).
+- Rotation is handled in place for Entry and Admin. State after process death is still not restored.
+- Invalid splits are now held back from the MM export (they stay Reviewed) instead of being exported as an equal split.
+
 - **Credits are recorded as spends.** Refunds, "credited", OTPs and "is due" SMS are parsed as Expense or Transfer-Out (`SmsParser.kt:28-38,107-113,155`). Add a negative-keyword gate, or map credits to Income.
 - **Live receiver accepts any sender.** `SmsReceiver.kt:43` doesn't check the sender, while backfill does (`AdminActivity.kt:1322`). Move `isKnownBankSender` into `sms/`, use it in both places, and make the list configurable.
 - **Wizard rules don't generalize.** They match only the sample, because the literal tail (balance, last 4 digits) is baked in (`SmsRuleBuilder.kt:121-137`). Drop the tail and turn digit runs into `\d+`.
