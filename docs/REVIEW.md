@@ -70,6 +70,22 @@ This review is read-only. Nothing in the code was changed. Paths are relative to
 
 ## P3: build / release
 
+**Status (2026-10-16): mostly done.**
+- Done:
+  - R8 shrinking and resource shrinking are on. The release APK is 3.5 MB, and debug/info logs are stripped.
+  - Compose is removed.
+  - Release signing reads an untracked `keystore.properties` file.
+  - GitHub Actions CI runs tests, lint, and debug and release builds.
+  - When secure prefs can't be read, the file is reset and opened again. A plaintext fallback, if still needed, goes to a separate `_plain` file, and Admin warns about it.
+- Smoke-tested the minified release on an emulator:
+  - App launch.
+  - SMS receive → notification.
+  - LAN server start, login, Host/Content-Type checks, CSP header, transaction list.
+- Open:
+  - `applicationId` is still `com.example.*`. Changing it makes a new app, so existing installs lose their data.
+  - `security-crypto` is still the deprecated alpha.
+  - Play SMS-permission policy.
+
 - `isMinifyEnabled=false`. `Log.d` stays in release builds and logs reference numbers (`SmsReceiver.kt:79`), and the proguard rules are the stock template.
 - `applicationId = com.example.*`: Play rejects it. There is also no signing config and no CI.
 - **Compose is entirely unused** but still declared (plugin, BOM, ui, material3, tooling). Delete it: a smaller APK and a faster build.

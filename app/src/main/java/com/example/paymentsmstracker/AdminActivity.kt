@@ -146,6 +146,13 @@ class AdminActivity : AppCompatActivity() {
 
         configStore = ConfigStore(this)
         splitwiseStore = SplitwiseAuthStore(this)
+        if (SplitwiseAuthStore.plaintextFallbackActive) {
+            Toast.makeText(
+                this,
+                "Secure storage is unavailable on this device: Splitwise/AI keys are stored unencrypted.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
         SplitwiseSessionEvents.observe(this, this)
         val toolbar: MaterialToolbar = findViewById(R.id.toolbarAdmin)
         setSupportActionBar(toolbar)
