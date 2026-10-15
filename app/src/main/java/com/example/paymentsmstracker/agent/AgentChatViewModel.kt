@@ -46,6 +46,12 @@ class AgentChatViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun send(text: String) {
         if (_busy.value == true || text.isBlank()) return
+        // Every turn re-sends the whole history (tool results included), so cost grows with it.
+        // Keep the last few exchanges; cutting at a user message keeps tool calls paired.
+        val userTurns = history.indices.filter { history[it] is ChatMessage.User }
+        if (userTurns.size >= MAX_EXCHANGES) {
+            history.subList(0, userTurns[userTurns.size - MAX_EXCHANGES + 1]).clear()
+        }
         val start = history.size
         history += ChatMessage.User(text.trim())
         add(ChatItem.UserText(text.trim()))
@@ -76,6 +82,11 @@ class AgentChatViewModel(application: Application) : AndroidViewModel(applicatio
                             add(ChatItem.Error(e.message ?: "AI request failed"))
                             return@launch
                         }
+                    if (reply.text.isBlank() && reply.toolCalls.isEmpty()) {
+                        // Not stored: an empty assistant turn would make every later request fail.
+                        add(ChatItem.Error("The AI sent an empty reply. Try rephrasing."))
+                        return@launch
+                    }
                     history += reply
                     if (reply.text.isNotBlank()) add(ChatItem.AssistantText(reply.text.trim()))
                     if (reply.toolCalls.isEmpty()) return@launch
@@ -131,6 +142,7 @@ class AgentChatViewModel(application: Application) : AndroidViewModel(applicatio
 
     companion object {
         private const val MAX_TURNS = 8
+        private const val MAX_EXCHANGES = 6
 
         private val SYSTEM = """
             You are the assistant inside a personal expense tracker (amounts in INR). Today is {today}.

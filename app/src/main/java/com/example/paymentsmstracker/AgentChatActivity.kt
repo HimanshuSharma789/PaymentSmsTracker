@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -75,7 +76,20 @@ class AgentChatActivity : AppCompatActivity() {
             submit()
             true
         }
-        applyAll.setOnClickListener { viewModel.applyAll() }
+        applyAll.setOnClickListener {
+            val pending = viewModel.items.value.orEmpty()
+                .filterIsInstance<ChatItem.Card>().filter { it.state == CardState.PENDING }
+            val freeText = pending.count { it.proposal.suggestion.changesFreeText }
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.agent_chat_apply_all, pending.size))
+                .setMessage(
+                    if (freeText > 0) getString(R.string.agent_chat_apply_all_free_text, freeText)
+                    else getString(R.string.agent_chat_apply_all_confirm)
+                )
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ -> viewModel.applyAll() }
+                .show()
+        }
 
         viewModel.items.observe(this) { items ->
             adapter.submit(items)
@@ -149,7 +163,9 @@ class AgentChatActivity : AppCompatActivity() {
                     ?.amounts?.entries?.joinToString(" · ") { "${it.key} ₹${it.value.toPlainString()}" }
             )
             view.findViewById<TextView>(R.id.textProposalWarnings).showText(
-                s.warnings.takeIf { it.isNotEmpty() }?.joinToString("\n") { "⚠ $it" }
+                (s.warnings + listOfNotNull(
+                    ctx.getString(R.string.agent_chat_free_text_warning).takeIf { s.changesFreeText }
+                )).takeIf { it.isNotEmpty() }?.joinToString("\n") { "⚠ $it" }
             )
             view.findViewById<TextView>(R.id.textProposalReason).showText(s.reason.ifBlank { null })
             view.findViewById<TextView>(R.id.textProposalState).text = listOfNotNull(

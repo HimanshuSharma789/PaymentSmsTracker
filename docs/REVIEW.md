@@ -54,6 +54,12 @@ This review is read-only. Nothing in the code was changed. Paths are relative to
 
 ## P2: AI Assist
 
+**Status (2026-10-16): fixed.**
+- Tests are in `AgentAssistTest`.
+- `qwen/qwen3.8-27b` exists on OpenRouter, but it is a cheap paid model, not free tier. The comment now says so.
+- Plain http is allowed only to this phone or a private-network host. An API key is sent only over https or to loopback.
+- Not changed: the Claude default stays `claude-haiku-4-5-20251001`. Moving to Haiku 5.5 means handling thinking blocks in the history first.
+
 - **Privacy bypass.** `propose_update` returns the *before* values (notes, merchant, split names) even when those fields are turned off (`AgentTools.kt:167`, `AgentProposal.kt:48`). Return only "card shown".
 - **Prompt injection.** SMS merchant text can steer up to 50 proposals, and "Apply all" writes them all with one tap. Add a confirm dialog and highlight free-text changes.
 - **Unbounded history.** It is re-sent every turn, so cost grows quadratically (`AgentChatViewModel.kt:38`). Trim to the last N turns.

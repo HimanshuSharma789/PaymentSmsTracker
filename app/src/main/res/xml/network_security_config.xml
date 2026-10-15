@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cleartext is allowed so AI Assist can reach a local model server (Ollama / LM Studio) on
+    this phone or the LAN, whose IPs can't be listed here. The app gates it in code:
+    AgentSettings.endpointProblem() only lets http through to local/private hosts, and no API key
+    is sent over http. Splitwise and cloud AI endpoints are https-only constants.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

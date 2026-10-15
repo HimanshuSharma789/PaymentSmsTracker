@@ -164,7 +164,9 @@ class AgentTools(
             val warnings = if (s.warnings.isEmpty()) "" else "; warnings: ${s.warnings.joinToString(" | ")}"
             if (!s.hasChanges && !markReviewed) return@map "id $id: rejected, nothing to change$warnings"
             proposals += Proposal(nextKey.incrementAndGet(), tx, s, markReviewed, groupId, labels.toMap())
-            val what = s.diff().joinToString(", ") { "${it.first} ${it.second} -> ${it.third}" }
+            // Field names only: the "before" values may be fields the user hid from the model
+            // (notes, merchant, friends), and the model already knows what it proposed.
+            val what = s.diff().joinToString(", ") { it.first }
                 .let { if (markReviewed) "$it, mark reviewed".trimStart(',', ' ') else it }
             "id $id: card shown ($what)$warnings"
         }.joinToString("\n")
