@@ -174,8 +174,12 @@ class LanApi(
         config: AppConfig
     ): Parsed {
         val amount = body.optDouble("amount", existing?.amount ?: Double.NaN)
-        if (amount.isNaN() || amount <= 0.0) {
-            return Parsed(error = "Amount must be greater than 0")
+        if (!amount.isFinite() || amount <= 0.0 || amount > MAX_AMOUNT) {
+            return Parsed(error = "Amount must be greater than 0 and at most $MAX_AMOUNT")
+        }
+        val tooLong = TEXT_FIELDS.firstOrNull { body.optString(it).length > MAX_TEXT_LENGTH }
+        if (tooLong != null) {
+            return Parsed(error = "$tooLong is too long (max $MAX_TEXT_LENGTH characters)")
         }
         val account = body.optString("account", existing?.account.orEmpty()).trim()
             .ifBlank { config.accounts.firstOrNull().orEmpty() }
@@ -183,6 +187,9 @@ class LanApi(
         val notesRaw = if (body.has("notes")) body.optString("notes").trim() else existing?.notes
         val notes = notesRaw?.ifBlank { null }
         val timestamp = body.optLong("timestamp", existing?.timestamp ?: System.currentTimeMillis())
+        if (timestamp !in MIN_TIMESTAMP..System.currentTimeMillis() + MAX_FUTURE_MS) {
+            return Parsed(error = "Date is out of range")
+        }
         val transactionType = MoneyManagerExporter.normalizeType(
             body.optString(
                 "transactionType",
@@ -194,6 +201,9 @@ class LanApi(
             "reviewStatus",
             existing?.reviewStatus ?: ReviewStatus.NEEDS_REVIEW
         ).ifBlank { ReviewStatus.NEEDS_REVIEW }
+        if (reviewStatus !in ReviewStatus.ALL) {
+            return Parsed(error = "reviewStatus must be one of ${ReviewStatus.ALL.joinToString()}")
+        }
 
         if (isTransfer) {
             if (account.isBlank()) {
@@ -393,5 +403,13 @@ class LanApi(
                     JSONObject.NULL
                 }
             )
+    }
+
+    private companion object {
+        const val MAX_AMOUNT = 1_000_000_000.0
+        const val MAX_TEXT_LENGTH = 2_000
+        val TEXT_FIELDS = listOf("merchantName", "notes", "account", "category", "subcategory")
+        const val MIN_TIMESTAMP = 946_684_800_000L // 2000-01-01
+        const val MAX_FUTURE_MS = 366L * 24 * 60 * 60 * 1000
     }
 }

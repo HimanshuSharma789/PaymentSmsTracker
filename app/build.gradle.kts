@@ -40,6 +40,11 @@ android {
     }
 }
 
+ksp {
+    // Commit app/schemas/: each version's JSON is what a future migration test diffs against.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)

@@ -395,4 +395,14 @@ class SmsParserAndExportTest {
         assertEquals("22.50", rows[0].amount)
         assertEquals("67.50", rows[1].amount)
     }
+
+    @Test
+    fun fallbackReferenceIsTheNumberNotAWord() {
+        val fallbackOnly = SmsParser(AppConfig(smsParseRules = emptyList()))
+        fun ref(sms: String) = fallbackOnly.parse(sms, requirePaymentHeuristic = false)?.referenceNumber
+        assertEquals("412345678901", ref("Rs 50 paid to Chai. UPI Ref No: 412345678901"))
+        assertEquals("998877", ref("Rs 50 debited. Ref no. 998877"))
+        assertEquals("ABC123456", ref("Rs 50 debited. Ref.No.ABC123456 thanks"))
+        assertEquals(null, ref("Refund of Rs 300 at Refreshments Corner"))
+    }
 }

@@ -241,13 +241,13 @@
     allocationBox.innerHTML = people.map((name) => {
       const val = existing[name] ?? fromTx[name] ?? (mode === "weight" ? "1" : "");
       const hint = mode === "percent" ? "%" : mode === "weight" ? "shares" : "₹";
-      return `<div class="allocRow"><span>${name}</span><input data-person="${name}" type="number" step="any" placeholder="${hint}" value="${val}" /></div>`;
+      return `<div class="allocRow"><span>${escapeHtml(name)}</span><input data-person="${escapeHtml(name)}" type="number" step="any" placeholder="${hint}" value="${escapeHtml(val)}" /></div>`;
     }).join("");
   }
 
   function fillMetaControls() {
     const accountSelect = document.getElementById("accountSelect");
-    accountSelect.innerHTML = (meta.accounts || []).map((a) => `<option value="${a}">${a}</option>`).join("");
+    accountSelect.innerHTML = (meta.accounts || []).map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
     fillCategoryOptionsForType();
     fillSplitwiseGroupOptions(splitwiseMeta().defaultGroupId || 0);
     fillMemberChips([], {});
@@ -269,14 +269,14 @@
     const current = categorySelect.value;
     if (isTransferType()) {
       categorySelect.innerHTML = [`<option value="">Select To account</option>`]
-        .concat((meta.accounts || []).map((a) => `<option value="${a}">${a}</option>`)).join("");
+        .concat((meta.accounts || []).map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)).join("");
     } else if (form.transactionType.value === "Income") {
       categorySelect.innerHTML = [`<option value="">Uncategorized</option>`]
-        .concat((meta.incomeCategories || []).map((c) => `<option value="${c}">${c}</option>`)).join("");
+        .concat((meta.incomeCategories || []).map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)).join("");
     } else {
       const cats = Object.keys(meta.expenseCategories || {});
       categorySelect.innerHTML = [`<option value="">Uncategorized</option>`]
-        .concat(cats.map((c) => `<option value="${c}">${c}</option>`)).join("");
+        .concat(cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)).join("");
     }
     if ([...categorySelect.options].some((o) => o.value === current)) {
       categorySelect.value = current;
@@ -314,7 +314,7 @@
     const sel = document.getElementById("subcategorySelect");
     const current = sel.value;
     sel.innerHTML = [`<option value=""></option>`]
-      .concat(subs.map((s) => `<option value="${s}">${s}</option>`)).join("");
+      .concat(subs.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`)).join("");
     if (subs.includes(current)) sel.value = current;
   }
 
@@ -450,7 +450,7 @@
   }
 
   function escapeHtml(s) {
-    return String(s || "")
+    return String(s ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")

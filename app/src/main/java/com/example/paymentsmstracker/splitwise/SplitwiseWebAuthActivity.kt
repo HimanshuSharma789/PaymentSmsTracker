@@ -160,7 +160,7 @@ class SplitwiseWebAuthActivity : AppCompatActivity() {
             return
         }
         val expected = store.consumeOAuthState()
-        if (!expected.isNullOrBlank() && expected != state) {
+        if (!SplitwiseAuthStore.isValidOAuthState(expected, state)) {
             Toast.makeText(this, "Splitwise auth state mismatch — try again", Toast.LENGTH_LONG).show()
             goHome()
             return

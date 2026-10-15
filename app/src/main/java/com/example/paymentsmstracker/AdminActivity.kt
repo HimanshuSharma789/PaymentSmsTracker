@@ -709,7 +709,15 @@ class AdminActivity : AppCompatActivity() {
         selectThemeModeChip(config.themeMode)
         refreshNightlyTimeLabel()
         refreshBackfillDateLabels()
-        editConfigJson.setText(configStore.exportJson())
+        val unreadable = configStore.unreadableJson()
+        editConfigJson.setText(unreadable ?: configStore.exportJson())
+        if (unreadable != null) {
+            Toast.makeText(
+                this,
+                "Saved config couldn't be read; using defaults. Fix the JSON under Rules and tap Save rules.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
         updateDebtCategoryEnabled()
         updateNightlyTimeEnabled()
         refreshThemeModeHint()

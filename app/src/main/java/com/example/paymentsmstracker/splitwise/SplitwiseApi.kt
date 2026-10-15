@@ -127,7 +127,24 @@ class SplitwiseApi(
         if (expenses == null || expenses.length() == 0) {
             throw SplitwiseApiException("create_expense returned no expense: $json")
         }
-        return expenses.getJSONObject(0).optLong("id")
+        val id = expenses.getJSONObject(0).optLong("id")
+        if (id <= 0L) throw SplitwiseApiException("create_expense returned no expense id: $json")
+        return id
+    }
+
+    /** Live expense in [groupId] dated within a day of [dateMillis] whose details contain [marker]. */
+    fun findExpenseWithMarker(groupId: Long, dateMillis: Long, marker: String): Long? {
+        requireSignedIn()
+        val day = 24 * 60 * 60 * 1000L
+        val query = encodeForm(
+            linkedMapOf(
+                "group_id" to groupId.toString(),
+                "dated_after" to isoDate(dateMillis - day),
+                "dated_before" to isoDate(dateMillis + day),
+                "limit" to "200"
+            )
+        )
+        return expenseIdWithMarker(get("$API_BASE/get_expenses?$query"), marker)
     }
 
     private fun requireSignedIn() {
@@ -223,6 +240,17 @@ class SplitwiseApi(
         const val LOGIN_URL = "https://secure.splitwise.com/login"
 
         fun from(store: SplitwiseAuthStore): SplitwiseApi = SplitwiseApi(store)
+
+        fun expenseIdWithMarker(json: JSONObject, marker: String): Long? {
+            val expenses = json.optJSONArray("expenses") ?: return null
+            for (i in 0 until expenses.length()) {
+                val e = expenses.optJSONObject(i) ?: continue
+                if (!e.isNull("deleted_at")) continue
+                if (!e.optString("details").contains(marker)) continue
+                return e.optLong("id").takeIf { it > 0L }
+            }
+            return null
+        }
     }
 }
 

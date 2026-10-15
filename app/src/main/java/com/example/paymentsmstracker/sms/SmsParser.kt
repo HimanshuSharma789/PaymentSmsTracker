@@ -248,10 +248,12 @@ class SmsParser(private val config: AppConfig) {
 
     private fun extractFallbackReference(message: String): String? {
         val pattern = Pattern.compile(
-            """(?i)(?:Ref(?:no|erence)?|UPI\s+Ref\s+No)\s*[:\s]*([A-Za-z0-9.-]+)"""
+            // Whole word "Ref"/"Reference", optional "No."/"Number", then a token with a digit,
+            // so "Ref No: 4123…" gives the number (not "No") and "Refund" matches nothing.
+            """(?i)\bRef(?:erence)?(?:\.?\s*No\.?|\s*Number)?\s*[:#.]?\s*(?=[A-Za-z0-9-]*\d)([A-Za-z0-9-]{6,})"""
         )
         val matcher = pattern.matcher(message)
-        return if (matcher.find()) matcher.group(1)?.trim()?.trimEnd('.', ',', ';') else null
+        return if (matcher.find()) matcher.group(1) else null
     }
 
     private fun namedGroup(matcher: java.util.regex.Matcher, name: String): String? {

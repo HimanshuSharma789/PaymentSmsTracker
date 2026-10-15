@@ -59,24 +59,33 @@ class LanAccessService : Service() {
             return
         }
         createChannel()
-        val host = NetworkUtils.localIpv4(this) ?: "0.0.0.0"
+        // startForegroundService() requires startForeground() even if we then bail out,
+        // otherwise Android crashes the app.
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            buildNotification(),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            } else {
+                0
+            }
+        )
+        val host = NetworkUtils.localIpv4(this)
+        if (host.isNullOrBlank()) {
+            Log.w(TAG, "No Wi-Fi address; not starting LAN server")
+            LanServerState.markStopped()
+            stopSelf()
+            return
+        }
         val code = if (accessCodeRequired) LanServerState.generateAccessCode() else ""
         val http = LocalHttpServer(applicationContext)
         try {
-            val port = http.start()
+            val port = http.start(host)
             server = http
             LanServerState.markStarting(durationMinutes, code, host, port, accessCodeRequired)
             stopAtElapsed = SystemClock.elapsedRealtime() + durationMinutes * 60_000L
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                buildNotification(),
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                } else {
-                    0
-                }
-            )
+            updateNotification()
             handler.removeCallbacks(tickRunnable)
             handler.postDelayed(tickRunnable, 30_000L)
             handler.postDelayed({ stopSelf() }, durationMinutes * 60_000L)
@@ -100,10 +109,6 @@ class LanAccessService : Service() {
     private fun updateNotification() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIFICATION_ID, buildNotification())
-        val host = NetworkUtils.localIpv4(this)
-        if (!host.isNullOrBlank()) {
-            LanServerState.updateHost(host)
-        }
     }
 
     private fun buildNotification(): Notification {

@@ -53,7 +53,7 @@
     <string name="split_value_hint">Value</string>
     <string name="split_allocations_title">Allocations</string>
     <string name="split_hint_exact">Enter exact ₹ amount for each person. Total must match the expense.</string>
-    <string name="split_hint_percent">Enter % for each person. Total must be 100.</string>
+    <string name="split_hint_percent" formatted="false">Enter % for each person. Total must be 100.</string>
     <string name="split_hint_weight">Enter share weights (e.g. 1, 2, 1). Larger weight = larger share.</string>
     <string name="split_hint_equal">Equal share for everyone selected.</string>
     <string name="admin">Admin</string>

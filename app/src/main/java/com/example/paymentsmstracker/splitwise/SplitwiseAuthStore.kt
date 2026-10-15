@@ -161,6 +161,11 @@ class SplitwiseAuthStore(context: Context) {
     }
 
     companion object {
+        /** Fails closed: with no saved state this app never started the sign-in, so a code
+         *  arriving on the exported deep link may be an attacker's (login CSRF). */
+        fun isValidOAuthState(expected: String?, received: String?): Boolean =
+            !expected.isNullOrBlank() && expected == received
+
         const val REDIRECT_URI = "paymentsmstracker://oauth/splitwise"
         private const val TAG = "SplitwiseAuthStore"
         private const val PREFS_NAME = "splitwise_auth"
