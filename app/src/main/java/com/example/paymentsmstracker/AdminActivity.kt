@@ -408,6 +408,7 @@ class AdminActivity : AppCompatActivity() {
             if (baseUrl.toHttpUrlOrNull() == null) {
                 url.error = getString(R.string.ai_invalid_url); return false
             }
+            AgentSettings.endpointProblem(baseUrl)?.let { url.error = it; return false }
             val apiKey = key.text?.toString().orEmpty()
             if (shown.keyRequired && apiKey.isBlank()) {
                 keyLayout.error = getString(R.string.ai_key_required); return false
