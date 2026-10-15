@@ -122,6 +122,10 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 startActivity(Intent(this, SplitsActivity::class.java))
                 true
             }
+            R.id.action_agent_chat -> {
+                startActivity(Intent(this, AgentChatActivity::class.java))
+                true
+            }
             R.id.action_export_reviewed -> {
                 confirmExportAllReviewed()
                 true

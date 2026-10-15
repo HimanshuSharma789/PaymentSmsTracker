@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.paymentsmstracker.agent.AgentPrivacy
 import com.example.paymentsmstracker.agent.AgentProvider
 import com.example.paymentsmstracker.agent.AgentSettings
 import com.example.paymentsmstracker.config.ConfigStore
@@ -432,9 +433,23 @@ class AdminActivity : AppCompatActivity() {
             isChecked = settings.enabled
             setOnCheckedChangeListener { _, checked -> settings.enabled = checked }
         }
-        findViewById<MaterialSwitch>(R.id.switchAiIncludeSms).apply {
-            isChecked = settings.includeSms
-            setOnCheckedChangeListener { _, checked -> settings.includeSms = checked }
+        val p = settings.privacy
+        listOf<Triple<Int, Boolean, (AgentPrivacy, Boolean) -> AgentPrivacy>>(
+            Triple(R.id.switchAiReadAmounts, p.amounts) { x, v -> x.copy(amounts = v) },
+            Triple(R.id.switchAiReadMerchants, p.merchants) { x, v -> x.copy(merchants = v) },
+            Triple(R.id.switchAiReadDates, p.dates) { x, v -> x.copy(dates = v) },
+            Triple(R.id.switchAiReadCategories, p.categories) { x, v -> x.copy(categories = v) },
+            Triple(R.id.switchAiReadNotes, p.notes) { x, v -> x.copy(notes = v) },
+            Triple(R.id.switchAiReadFriends, p.friends) { x, v -> x.copy(friends = v) },
+            Triple(R.id.switchAiReadMerchantMemory, p.merchantMemory) { x, v -> x.copy(merchantMemory = v) },
+            Triple(R.id.switchAiReadHistory, p.history) { x, v -> x.copy(history = v) },
+            Triple(R.id.switchAiIncludeSms, p.sms) { x, v -> x.copy(sms = v) },
+            Triple(R.id.switchAiReadLocation, p.location) { x, v -> x.copy(location = v) }
+        ).forEach { (id, on, toggle) ->
+            findViewById<MaterialSwitch>(id).apply {
+                isChecked = on
+                setOnCheckedChangeListener { _, checked -> settings.privacy = toggle(settings.privacy, checked) }
+            }
         }
     }
 

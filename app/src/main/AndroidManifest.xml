@@ -88,6 +88,10 @@
         <activity android:name=".TransactionListActivity" />
         <activity android:name=".SplitsActivity" />
         <activity
+            android:name=".AgentChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".AdminActivity"
             android:exported="false"
             android:launchMode="singleTop" />

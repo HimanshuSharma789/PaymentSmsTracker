@@ -1,0 +1,16 @@
+---
+description: Load Payment SMS Tracker project memory before changing this app
+alwaysApply: true
+---
+
+# Project memory
+
+This Android app (`PaymentSmsTracker`) captures payment SMS, reviews locally, exports Money Manager TSV, and optionally pushes splits to Splitwise. No cloud ledger. Merchant memory prefills category/account; SMS rules can be added via wizard or JSON.
+
+Before implementing, read:
+
+1. `AGENTS.md`
+2. `docs/INDEX.md`
+3. The matching doc: `docs/PROBLEM.md`, `docs/USER_FLOW.md`, `docs/DATA_FLOW.md`, `docs/ARCHITECTURE.md`
+
+Keep split math in `SplitCalculator`, MM rows in `MoneyManagerExporter`, SMS patterns in `AppConfig` rules (or `SmsRuleBuilder`). New SMS captures stay `needs_review`. Merchant learning goes through `MerchantMemory`.

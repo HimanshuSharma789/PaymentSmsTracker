@@ -74,6 +74,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.button_view_all_transactions).setOnClickListener {
             openTransactionList(ListFilter.ALL)
         }
+        findViewById<MaterialButton>(R.id.buttonHomeAgentChat).setOnClickListener {
+            startActivity(Intent(this, AgentChatActivity::class.java))
+        }
 
         observeHomeCounts()
         askStartupPermissionsOnce()

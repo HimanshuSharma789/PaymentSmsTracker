@@ -13,6 +13,10 @@
         android:title="@string/select_to_delete"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/action_agent_chat"
+        android:title="@string/agent_chat_open"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_open_splits"
         android:title="@string/open_splits_table"
         app:showAsAction="never" />
