@@ -1,122 +1,162 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- One shared bill. SplitTableAdapter binds the base ids; SplitsActivity adds the Mono parts
+     (monogram, total, segment bar, per-person line, per-bill pills). -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/cardSplitRow"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginVertical="3dp"
+    android:layout_marginBottom="10dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="0dp"
     app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="1dp">
+    app:strokeWidth="1.5dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="10dp">
-
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkSplitSelect"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:visibility="gone"
-            tools:visibility="visible" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/textSplitMerchant"
-                android:layout_width="match_parent"
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkSplitSelect"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="?android:textColorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                tools:text="Movie tickets" />
-
-            <TextView
-                android:id="@+id/textSplitMeta"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="?android:textColorSecondary"
-                android:textSize="12sp"
-                tools:text="26 Jul · ME, PUNEET · Uneven" />
-
-            <TextView
-                android:id="@+id/textSplitBreakdown"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="?android:textColorSecondary"
-                android:textSize="12sp"
-                tools:text="Total ₹100.00 · You ₹25.00" />
-
-            <TextView
-                android:id="@+id/textSplitError"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="@color/split_status_failed_fg"
-                android:textSize="12sp"
+                android:layout_marginEnd="4dp"
                 android:visibility="gone"
-                tools:text="Push failed: group not found"
                 tools:visibility="visible" />
-        </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:gravity="end"
-            android:orientation="vertical">
+            <TextView
+                android:id="@+id/textSplitMonogram"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/splits_bg_circle_outline"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                tools:text="T" />
 
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textSplitMerchant"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    tools:text="Toit Brewpub" />
+
+                <TextView
+                    android:id="@+id/textSplitMeta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="16 Oct · ICICI ••7781 · Food / Dining out" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textSplitTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textAppearance="@style/TextAppearance.Mono.Amount"
+                android:textSize="18sp"
+                tools:text="₹3,600" />
+
+            <!-- Bound by SplitTableAdapter; the per-person line below shows the same money. -->
             <TextView
                 android:id="@+id/textSplitFriendsOwe"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                tools:text="₹75.00" />
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/splitsSegments"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_marginTop="14dp"
+            android:importantForAccessibility="noHideDescendants"
+            android:orientation="horizontal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/textSplitBreakdown"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/split_row_friends_owe"
-                android:textColor="?android:textColorSecondary"
-                android:textSize="10sp" />
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                tools:text="Rahul ₹1,200 · Aisha ₹1,200" />
 
             <TextView
                 android:id="@+id/textSplitStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                style="@style/Widget.Mono.Tag"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_split_status"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="Pending" />
+                tools:text="Pushed" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/textSplitError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="@color/mono_error"
+            android:visibility="gone"
+            tools:text="Push failed: group not found"
+            tools:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/splitsActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonSplitPush"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="44dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/splits_mono_push" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonSplitMarkAdded"
+                style="@style/Widget.Mono.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:minHeight="44dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/splits_mono_mark_added" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

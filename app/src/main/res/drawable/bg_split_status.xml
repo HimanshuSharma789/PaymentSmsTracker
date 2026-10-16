@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Solid ink pill: "done" tags and your share in the split bar. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <corners android:radius="999dp" />
-    <solid android:color="@android:color/white" />
+    <solid android:color="@color/mono_ink" />
 </shape>

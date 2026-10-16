@@ -1,40 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A proposed change to one transaction. Nothing is written until Apply. Text on yellow uses the
+     fixed mono_on_yellow colours so it stays readable in dark mode. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    style="?attr/materialCardViewOutlinedStyle"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="4dp">
+    android:layout_marginVertical="6dp"
+    app:cardBackgroundColor="@color/mono_yellow">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="18dp">
 
         <TextView
-            android:id="@+id/textProposalHeader"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textAppearance="?attr/textAppearanceTitleSmall"
-            tools:text="Zomato · ₹640.00 · 25 Sep 2026" />
+            android:text="@string/agent_mono_proposal"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="@color/mono_on_yellow_meta" />
 
         <TextView
             android:id="@+id/textProposalDiff"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:textColor="@color/mono_on_yellow"
             tools:text="Category: – → Food" />
+
+        <TextView
+            android:id="@+id/textProposalReason"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="@color/mono_on_yellow_meta"
+            tools:text="Zomato is food delivery." />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/agent_bg_proposal_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="10dp">
+
+            <TextView
+                android:id="@+id/textProposalMonogram"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/agent_bg_circle_on_yellow"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:textColor="@color/mono_yellow"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="Z" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textProposalHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="@color/mono_on_yellow"
+                    tools:text="Zomato" />
+
+                <TextView
+                    android:id="@+id/textProposalMeta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="@color/mono_on_yellow_meta"
+                    tools:text="25 Sep 2026 · HDFC ••2149" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textProposalAmount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textAppearance="@style/TextAppearance.Mono.Amount"
+                android:textColor="@color/mono_on_yellow"
+                tools:text="₹640" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/textProposalSplit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textAppearance="?attr/textAppearanceBodySmall"
-            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="@color/mono_on_yellow"
             android:visibility="gone"
             tools:text="ME ₹320.00 · Puneet ₹320.00"
             tools:visibility="visible" />
@@ -43,52 +115,48 @@
             android:id="@+id/textProposalWarnings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
             android:textAppearance="?attr/textAppearanceBodySmall"
-            android:textColor="?attr/colorError"
+            android:textColor="@color/mono_on_yellow"
+            android:textStyle="bold"
             android:visibility="gone"
             tools:text="⚠ Ignored unknown category"
             tools:visibility="visible" />
 
         <TextView
-            android:id="@+id/textProposalReason"
+            android:id="@+id/textProposalState"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textAppearance="?attr/textAppearanceBodySmall"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textStyle="italic"
-            tools:text="Zomato is food delivery." />
+            android:layout_marginTop="10dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/mono_on_yellow"
+            tools:text="Applied" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical|end"
+            android:layout_marginTop="10dp"
             android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/textProposalState"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textAppearance="?attr/textAppearanceLabelMedium"
-                tools:text="Applied" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonProposalSkip"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/agent_chat_skip" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonProposalApply"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/agent_chat_apply" />
+                android:layout_weight="1"
+                android:text="@string/agent_chat_apply"
+                android:textColor="@color/mono_yellow"
+                app:backgroundTint="@color/mono_on_yellow" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonProposalSkip"
+                style="@style/Widget.Mono.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:text="@string/agent_chat_skip"
+                android:textColor="@color/mono_on_yellow"
+                app:strokeColor="@color/mono_on_yellow" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
