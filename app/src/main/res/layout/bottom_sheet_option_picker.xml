@@ -4,14 +4,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="16dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="24dp">
 
     <TextView
         android:id="@+id/textPickerTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="12dp"
-        android:textAppearance="?attr/textAppearanceTitleMedium" />
+        android:accessibilityHeading="true"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="14dp"
+        android:textAppearance="?attr/textAppearanceTitleLarge" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerPickerOptions"

@@ -19,4 +19,17 @@
     <color name="split_status_pushed_fg">#15803D</color>
     <color name="split_status_failed_bg">#FEE2E2</color>
     <color name="split_status_failed_fg">#B91C1C</color>
+
+    <!-- Mono: warm off-white, near-black ink, one sunflower accent. Night overrides in values-night. -->
+    <color name="mono_bg">#EFEDE8</color>
+    <color name="mono_surface">#FFFFFF</color>
+    <color name="mono_ink">#121212</color>
+    <color name="mono_on_ink">#FFFFFF</color>
+    <color name="mono_meta">#63635E</color>
+    <color name="mono_line">#DEDBD3</color>
+    <color name="mono_yellow">#FFD23F</color>
+    <!-- Text on the yellow accent stays dark in both themes. -->
+    <color name="mono_on_yellow">#121212</color>
+    <color name="mono_on_yellow_meta">#4A4633</color>
+    <color name="mono_error">#B42318</color>
 </resources>

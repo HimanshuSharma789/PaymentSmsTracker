@@ -769,7 +769,7 @@ class AdminActivity : AppCompatActivity() {
             val tag = findViewById<Chip>(checkedId).tag?.toString()
             if (!tag.isNullOrBlank()) return ThemeMode.normalize(tag)
         }
-        return ThemeMode.DYNAMIC
+        return ThemeMode.DEFAULT
     }
 
     private fun refreshThemeModeHint() {

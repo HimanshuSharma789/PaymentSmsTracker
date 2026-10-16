@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- User text: dark ink bubble on the right. Assistant text / errors: full-width white card.
+     AgentChatActivity.bindMessage sets the side, colours and corners. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingVertical="4dp">
+    android:paddingVertical="6dp">
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardAgentMessage"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
         app:strokeWidth="0dp">
 
@@ -23,16 +24,16 @@
             android:id="@+id/textAgentMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:maxWidth="300dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="10dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:lineSpacingMultiplier="1.15"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="12dp"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
             android:textIsSelectable="true"
             tools:text="Found 4 pending transactions." />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonReportResponse"
-            style="@style/Widget.Material3.Button.TextButton"
+            style="@style/Widget.Mono.Button.Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"

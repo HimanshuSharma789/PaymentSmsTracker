@@ -2,6 +2,37 @@
     <string name="app_name">PaymentSmsTracker</string>
     <string name="transactions">Transactions</string>
     <string name="quick_start">Quick Start</string>
+
+    <!-- Mono nav + home -->
+    <string name="nav_home">Home</string>
+    <string name="nav_all">All transactions</string>
+    <string name="nav_ask">AI Assist</string>
+    <string name="nav_splits">Splits</string>
+    <string name="nav_send">Send to Money Manager</string>
+    <string name="mono_spent_in">Spent in %1$s</string>
+    <string name="mono_vs_last_less">%1$s less than %2$s so far</string>
+    <string name="mono_vs_last_more">%1$s more than %2$s so far</string>
+    <string name="mono_vs_last_same">Same as %1$s so far</string>
+    <string name="mono_last_7_days">Last 7 days</string>
+    <string name="mono_week_total">%1$s total</string>
+    <string name="mono_review">Review</string>
+    <string name="mono_review_hint">Tap the circle to confirm a guess</string>
+    <string name="mono_left">%1$d left</string>
+    <string name="mono_review_empty">Nothing to review. New payment SMS land here.</string>
+    <string name="mono_see_all_review">See all %1$d to review</string>
+    <string name="mono_choose">Choose</string>
+    <string name="mono_confirm_guess">Confirm %1$s as %2$s</string>
+    <string name="mono_confirmed">%1$s marked reviewed</string>
+    <string name="mono_undo">Undo</string>
+    <string name="mono_ready_title">Ready for Money Manager</string>
+    <string name="mono_ready_sub">%1$d reviewed, not sent yet</string>
+    <string name="mono_ready_none">Nothing waiting. Reviewed payments gather here.</string>
+    <string name="mono_send">Send</string>
+    <string name="mono_splits_title">Splits</string>
+    <string name="mono_splits_sub">%1$d shared bills not on Splitwise yet</string>
+    <string name="mono_splits_none">No shared bills waiting</string>
+    <string name="mono_add">Add a payment by hand</string>
+    <string name="mono_settings">Settings</string>
     <string name="home_whats_left">What&#8217;s left</string>
     <string name="home_summary">%1$d to review · %2$d ready for Money Manager · %3$d splits pending</string>
     <string name="home_summary_caught_up">You&#8217;re caught up</string>
@@ -363,6 +394,91 @@ Location is stored only on this phone and is never sent anywhere unless you turn
     <string name="ai_read_location">Location</string>
     <string name="ai_read_location_hint">Latitude and longitude of the payment.</string>
     <string name="ai_disclosure">Only the items switched on above are sent to the chosen provider (OpenRouter forwards them to the model\'s vendor), and only when you use AI Assist. Reference numbers, Splitwise tokens and API keys are never sent.</string>
+    <!-- Mono: transaction list / send -->
+    <string name="list_back">Back</string>
+    <string name="list_send_title">Money Manager</string>
+    <string name="list_send_label">Reviewed, not yet exported</string>
+    <string name="list_send_your_spend">Your spend</string>
+    <string name="list_send_entries">Entries</string>
+    <string name="list_send_entries_hint">Long-press to pick only some of them.</string>
+    <string name="list_send_range">%1$s · one .tsv, Realbyte format</string>
+    <plurals name="list_send_file">
+        <item quantity="one">%1$d row · %2$s</item>
+        <item quantity="other">%1$d rows · %2$s</item>
+    </plurals>
+    <string name="list_send_full_on">Count full bill as mine: on</string>
+    <string name="list_send_full_off">Count full bill as mine: off</string>
+    <string name="list_send_full_on_hint">Shared bills go to their category in full. Splitwise still tracks who owes you. Change it in Admin.</string>
+    <string name="list_send_full_off_hint">Friends\' shares go to %1$s. Change it in Admin.</string>
+    <string name="list_send_dues_meta">Friends\' share of shared bills</string>
+    <string name="list_send_income">income</string>
+    <string name="list_send_transfer">transfer</string>
+    <plurals name="list_entries">
+        <item quantity="one">%d entry</item>
+        <item quantity="other">%d entries</item>
+    </plurals>
+    <plurals name="list_export_entries">
+        <item quantity="one">Export %d entry</item>
+        <item quantity="other">Export %d entries</item>
+    </plurals>
+    <string name="list_empty_needs_review">All caught up. New payment SMS show up here for a quick check.</string>
+    <string name="list_empty_reviewed">Nothing to send yet. Transactions you review gather here, ready for Money Manager.</string>
+    <string name="list_empty_exported">Nothing exported yet. Send reviewed entries to Money Manager and they stay here until you clear them in Admin.</string>
+    <string name="list_empty_all">No transactions yet. Payment SMS from your bank appear here, or add one from Home.</string>
+    <string name="list_status_needs_review">Needs review</string>
+    <string name="list_status_reviewed">Reviewed</string>
+    <string name="list_status_exported">Exported</string>
+    <!-- Mono: Review -->
+    <string name="review_back">Back</string>
+    <string name="review_add_title">Add payment</string>
+    <string name="review_today">Today, %1$s</string>
+    <string name="review_amount_hint">0</string>
+    <string name="review_sms_desc">Original bank SMS. Tap to show all of it.</string>
+    <string name="review_no_options">Add some in Admin</string>
+    <string name="review_split_section">Split with</string>
+    <string name="review_people">People</string>
+    <string name="review_note">Note</string>
+    <string name="review_note_hint">Add a note</string>
+    <string name="review_save_draft">Save draft</string>
+    <string name="review_mark_reviewed">Mark reviewed</string>
+    <!-- Mono: Splits -->
+    <string name="splits_mono_owed_to_you">Owed to you</string>
+    <string name="splits_mono_owed_on_splitwise">Owed to you, on Splitwise</string>
+    <string name="splits_mono_shared_bills">Shared bills</string>
+    <string name="splits_mono_one_per_bill">One Splitwise expense per bill</string>
+    <string name="splits_mono_export_csv">Export CSV</string>
+    <string name="splits_mono_push">Push to Splitwise</string>
+    <string name="splits_mono_retry">Retry push</string>
+    <string name="splits_mono_mark_added">Already added</string>
+    <string name="splits_mono_mark_selected_added">Already added</string>
+    <string name="splits_mono_push_cd">Push %1$s to Splitwise</string>
+    <string name="splits_mono_mark_added_cd">Mark %1$s as already added to Splitwise</string>
+    <string name="splits_mono_connected">Splitwise connected</string>
+    <string name="splits_mono_not_connected">Splitwise not connected</string>
+    <string name="splits_mono_to_push">%1$d to push</string>
+    <string name="splits_mono_all_pushed">All on Splitwise</string>
+    <string name="splits_mono_on_splitwise">On Splitwise</string>
+    <string name="splits_mono_added_by_hand">Added by hand</string>
+    <string name="splits_mono_person_cd">%1$s owes you %2$s</string>
+    <plurals name="splits_mono_people">
+        <item quantity="one">%d person</item>
+        <item quantity="other">%d people</item>
+    </plurals>
+    <plurals name="splits_mono_bills">
+        <item quantity="one">%d bill</item>
+        <item quantity="other">%d bills</item>
+    </plurals>
+    <!-- Mono: Ask -->
+    <string name="agent_mono_title">Ask</string>
+    <string name="agent_mono_hint">Ask about your spending</string>
+    <string name="agent_mono_send_cd">Send question</string>
+    <string name="agent_mono_proposal">Proposal</string>
+    <string name="agent_mono_your_key">Your key · %1$s</string>
+    <string name="agent_mono_off">Off</string>
+    <string name="agent_mono_reads">Reads %1$s.</string>
+    <string name="agent_mono_reads_nothing">Reads nothing about your transactions.</string>
+    <string name="agent_mono_and">and</string>
+    <string name="agent_mono_never_sent">Never reference numbers or tokens. It can only propose; you apply.</string>
     <!-- Play: disclosures -->
     <string name="disclosure_sms_title">Read your bank payment SMS</string>
     <string name="disclosure_sms_body">Payment SMS Tracker reads the SMS that banks and UPI apps send when money leaves or enters your account. It uses them to fill in the amount, merchant, date and account of each transaction for you to review.\n\n• Only messages from senders that look like banks are read; personal messages are skipped and never stored.\n• Transactions are saved only on this phone. They are not uploaded to us, and we don\'t run any server.\n• They leave the phone only if you choose to: pushing a split to Splitwise, or turning on AI Assist with your own API key.\n\nYou can turn this off any time in Android Settings → Apps → Payment SMS Tracker → Permissions.</string>

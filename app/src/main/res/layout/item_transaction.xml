@@ -1,121 +1,132 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mono list row: day label (first row of a day) + white card. TransactionListActivity restyles after bind. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="4dp"
-    android:layout_marginVertical="3dp"
-    android:clickable="true"
-    android:focusable="true"
-    android:foreground="?attr/selectableItemBackground"
     android:orientation="vertical">
 
     <TextView
         android:id="@+id/textViewGroupDate"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="4dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="4dp"
-        android:textColor="?attr/colorPrimary"
-        android:textSize="12sp"
-        android:textStyle="bold"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="8dp"
+        android:paddingHorizontal="4dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textFontWeight="500"
         android:visibility="gone"
+        tools:ignore="UnusedAttribute"
         tools:text="01 Aug 2026"
         tools:visibility="visible" />
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardListRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="0dp"
-        app:strokeColor="?attr/colorOutlineVariant"
-        app:strokeWidth="1dp">
+        android:layout_marginBottom="8dp"
+        android:duplicateParentState="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:duplicateParentState="true"
             android:gravity="center_vertical"
+            android:minHeight="72dp"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="10dp">
+            android:paddingStart="14dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp">
 
             <com.google.android.material.checkbox.MaterialCheckBox
                 android:id="@+id/checkSelectTransaction"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:minWidth="44dp"
+                android:minHeight="44dp"
                 android:visibility="gone"
                 tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/textListMonogram"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_mono_circle_ink"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="@color/mono_on_ink"
+                android:textFontWeight="700"
+                tools:ignore="UnusedAttribute"
+                tools:text="S" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <LinearLayout
+                <TextView
+                    android:id="@+id/textViewMerchant"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/textViewMerchant"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="?android:textColorPrimary"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        tools:text="Starbucks" />
-
-                    <TextView
-                        android:id="@+id/textViewAmount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:textColor="?android:textColorPrimary"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        tools:text="₹12.50" />
-                </LinearLayout>
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    tools:text="Starbucks" />
 
                 <TextView
                     android:id="@+id/textViewCategory"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="1dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="?android:textColorSecondary"
-                    android:textSize="12sp"
-                    tools:text="Expense · HSBC · Food / Lunch" />
-
-                <TextView
-                    android:id="@+id/textViewStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:visibility="gone"
-                    tools:text="Needs review"
-                    tools:visibility="visible" />
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="HSBC · Food / Lunch · 1 Aug" />
 
                 <TextView
                     android:id="@+id/textViewNotes"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="1dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="?android:textColorSecondary"
-                    android:textSize="12sp"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
                     android:visibility="gone"
                     tools:text="Split: ME,PUNEET"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textViewAmount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Mono.Amount"
+                    tools:text="₹450" />
+
+                <TextView
+                    android:id="@+id/textViewStatus"
+                    style="@style/Widget.Mono.Tag"
+                    android:layout_marginTop="4dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="Needs review"
                     tools:visibility="visible" />
             </LinearLayout>
         </LinearLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mono_bg">#141412</color>
+    <color name="mono_surface">#1F1F1C</color>
+    <color name="mono_ink">#F2F0EA</color>
+    <color name="mono_on_ink">#141412</color>
+    <color name="mono_meta">#A9A79F</color>
+    <color name="mono_line">#34332F</color>
+    <color name="mono_error">#F97066</color>
+</resources>

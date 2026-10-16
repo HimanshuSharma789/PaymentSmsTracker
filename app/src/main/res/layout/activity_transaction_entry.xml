@@ -1,479 +1,674 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".TransactionEntryActivity">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <!-- Header: back, centred title, AI Assist + delete. -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:minHeight="60dp"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar_transaction_entry"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@drawable/outline_arrow_back_24"
-            app:title="Review Transaction" />
-    </com.google.android.material.appbar.AppBarLayout>
+        <ImageButton
+            android:id="@+id/buttonEntryBack"
+            style="@style/Widget.Mono.IconButton"
+            android:layout_gravity="start|center_vertical"
+            android:contentDescription="@string/review_back"
+            android:src="@drawable/review_ic_back" />
+
+        <TextView
+            android:id="@+id/textEntryTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:accessibilityHeading="true"
+            android:text="@string/mono_review"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            tools:targetApi="p" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/buttonAiOpenChat"
+                style="@style/Widget.Mono.IconButton"
+                android:contentDescription="@string/agent_chat_open"
+                android:src="@drawable/ic_mono_sparkle" />
+
+            <ImageButton
+                android:id="@+id/buttonDeleteTransaction"
+                style="@style/Widget.Mono.IconButton"
+                android:layout_marginStart="8dp"
+                android:contentDescription="@string/delete_transaction"
+                android:src="@drawable/review_ic_trash"
+                android:visibility="gone"
+                tools:visibility="visible" />
+        </LinearLayout>
+    </FrameLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:paddingBottom="84dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="16dp">
+            android:paddingStart="20dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="24dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonToggleSms"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:gravity="start|center_vertical"
-                android:text="@string/show_original_sms"
-                android:textAllCaps="false"
-                app:icon="@drawable/baseline_sms_24" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonOpenLocation"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:gravity="start|center_vertical"
-                android:text="@string/view_location_on_map"
-                android:textAllCaps="false"
-                android:visibility="gone"
-                app:icon="@drawable/baseline_place_24"
-                tools:visibility="visible" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/card_original_sms"
-                style="?attr/materialCardViewOutlinedStyle"
+            <!-- Merchant: monogram, editable name, tappable date/time. -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/textEntryMonogram"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:background="@drawable/bg_mono_circle_ink"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:textColor="@color/mono_on_ink"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    tools:text="T" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <EditText
+                        android:id="@+id/editTextMerchant"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="@string/merchant_name"
+                        android:imeOptions="actionNext"
+                        android:importantForAutofill="no"
+                        android:inputType="textCapWords"
+                        android:minHeight="44dp"
+                        android:padding="0dp"
+                        android:singleLine="true"
+                        android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                        android:textColorHint="?attr/colorOnSurfaceVariant"
+                        android:textSize="26sp"
+                        tools:text="Toit Brewpub" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonDate"
+                        style="@style/Widget.Mono.Button.Text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="start|center_vertical"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="44dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="8dp"
+                        android:textAllCaps="false"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        app:icon="@drawable/outline_calendar_month_24"
+                        app:iconPadding="6dp"
+                        app:iconSize="16dp"
+                        app:iconTint="?attr/colorOnSurfaceVariant"
+                        tools:text="Today, 9:42 pm" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Hero amount, still editable. Smaller ₹ on the baseline. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:baselineAligned="true"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="3dp"
+                    android:contentDescription="@string/amount"
+                    android:labelFor="@id/editTextAmount"
+                    android:text="₹"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textFontWeight="300"
+                    android:textSize="28sp"
+                    tools:ignore="HardcodedText"
+                    tools:targetApi="p" />
+
+                <EditText
+                    android:id="@+id/editTextAmount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:fontFeatureSettings="tnum"
+                    android:hint="@string/review_amount_hint"
+                    android:imeOptions="actionNext"
+                    android:importantForAutofill="no"
+                    android:includeFontPadding="false"
+                    android:inputType="numberDecimal"
+                    android:nextFocusForward="@id/editTextMerchant"
+                    android:padding="0dp"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceDisplayLarge"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
+                    android:textSize="52sp"
+                    tools:text="3,600" />
+            </LinearLayout>
+
+            <!-- Bank SMS: quiet block, two lines; tap to show it all. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_original_sms"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:clickable="true"
+                android:contentDescription="@string/review_sms_desc"
+                android:focusable="true"
                 android:visibility="gone"
+                app:cardCornerRadius="14dp"
                 tools:visibility="visible">
 
                 <TextView
                     android:id="@+id/textViewOriginalSms"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="12dp"
+                    android:ellipsize="end"
+                    android:fontFeatureSettings="tnum"
+                    android:maxLines="2"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
                     android:textAppearance="?attr/textAppearanceBodySmall"
-                    tools:text="Original SMS..." />
+                    android:textSize="12.5sp"
+                    tools:text="Rs.3600.00 debited from A/c XX7781 on 16-10-26 to VPA toitbrewpub@hdfc UPI Ref 6289****" />
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonAiOpenChat"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:id="@+id/buttonOpenLocation"
+                style="@style/Widget.Mono.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="44dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="16dp"
+                android:text="@string/view_location_on_map"
+                android:textAllCaps="false"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:icon="@drawable/baseline_place_24"
+                app:iconSize="18dp"
+                app:iconTint="?attr/colorOnSurface"
+                tools:visibility="visible" />
+
+            <!-- Category: chips straight from the configured lists. -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="@string/agent_chat_open"
-                app:icon="@drawable/baseline_auto_awesome_24" />
+                android:layout_marginTop="26dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <com.google.android.material.card.MaterialCardView
-                style="?attr/materialCardViewFilledStyle"
+                <TextView
+                    android:id="@+id/textCategoryTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:accessibilityHeading="true"
+                    android:text="@string/category"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    tools:targetApi="p" />
+
+                <TextView
+                    android:id="@+id/textCategoryHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/review_no_options"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupCategory"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="0dp" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupSubcategory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:visibility="gone"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="0dp"
+                tools:visibility="visible" />
+
+            <!-- Account and type: tappable rows that open the existing pickers. -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="12dp">
+                    android:orientation="vertical">
 
                     <LinearLayout
+                        android:id="@+id/buttonPickAccount"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:baselineAligned="false"
-                        android:orientation="horizontal">
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="56dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="14dp">
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/textField_amount"
-                            android:layout_width="116dp"
+                        <TextView
+                            android:id="@+id/textPickAccountLabel"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:hint="@string/amount"
-                            app:startIconDrawable="@drawable/outline_currency_rupee_24">
+                            android:text="@string/account"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/editTextAmount"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:imeOptions="actionNext"
-                                android:inputType="numberDecimal"
-                                android:nextFocusForward="@id/editTextMerchant"
-                                android:singleLine="true" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/textField_merchant"
+                        <TextView
+                            android:id="@+id/textPickAccountValue"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
+                            android:layout_marginStart="12dp"
                             android:layout_weight="1"
-                            android:hint="@string/merchant_name">
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            tools:text="ICICI card" />
 
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/editTextMerchant"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:imeOptions="actionNext"
-                                android:inputType="textCapWords"
-                                android:singleLine="true" />
-                        </com.google.android.material.textfield.TextInputLayout>
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="6dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/review_ic_chevron"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/buttonDate"
-                        style="@style/Widget.Material3.Button.TextButton"
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:gravity="start|center_vertical"
-                        android:textAllCaps="false"
-                        android:textAppearance="?attr/textAppearanceBodyMedium"
-                        app:icon="@drawable/outline_calendar_month_24"
-                        tools:text="Oct 29, 2023" />
+                        android:layout_height="1dp"
+                        android:layout_marginHorizontal="18dp"
+                        android:background="@color/mono_line" />
+
+                    <LinearLayout
+                        android:id="@+id/buttonPickType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="56dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/transaction_type"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/textPickTypeValue"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            tools:text="Expense" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="6dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/review_ic_chevron"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Split with -->
+            <LinearLayout
+                android:id="@+id/rowSplitHeader"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="4dp"
-                android:text="@string/classification"
-                android:textAppearance="?attr/textAppearanceLabelLarge" />
+                android:layout_marginTop="26dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:accessibilityHeading="true"
+                    android:text="@string/review_split_section"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    tools:targetApi="p" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonToggleMore"
+                    style="@style/Widget.Mono.Button.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="@string/add_split"
+                    android:textAllCaps="false"
+                    android:textSize="14sp"
+                    app:icon="@drawable/ic_mono_people"
+                    app:iconSize="18dp"
+                    app:iconTint="?attr/colorOnSurface" />
+            </LinearLayout>
 
             <com.google.android.material.card.MaterialCardView
-                style="?attr/materialCardViewOutlinedStyle"
+                android:id="@+id/containerMoreDetails"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"
+                tools:visibility="visible">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="16dp">
 
-                    <LinearLayout
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPickSplitwiseGroup"
+                        style="@style/Widget.Mono.Button.Outlined"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="44dp"
+                        android:text="@string/splitwise_group_picker"
+                        android:textAllCaps="false"
+                        android:textSize="14sp" />
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPickAccount"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:gravity="start|center_vertical"
-                            android:maxLines="1"
-                            android:text="@string/account"
-                            android:textAllCaps="false" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPickType"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_marginStart="8dp"
-                            android:layout_weight="1"
-                            android:gravity="start|center_vertical"
-                            android:text="Expense"
-                            android:textAllCaps="false" />
-                    </LinearLayout>
-
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/textSplitMembersHint"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
+                        android:text="@string/split_pick_group_first"
+                        android:textAppearance="?attr/textAppearanceBodySmall" />
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPickCategory"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:gravity="start|center_vertical"
-                            android:maxLines="1"
-                            android:text="@string/category"
-                            android:textAllCaps="false" />
+                    <TextView
+                        android:id="@+id/textSplitWithLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/review_people"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPickSubcategory"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_marginStart="8dp"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:gravity="start|center_vertical"
-                            android:maxLines="1"
-                            android:text="@string/subcategory"
-                            android:textAllCaps="false" />
-                    </LinearLayout>
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroupParticipants"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:visibility="gone"
+                        app:chipSpacingHorizontal="8dp"
+                        app:chipSpacingVertical="0dp"
+                        app:singleSelection="false"
+                        tools:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/textSplitTypeLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/split_type"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroupSplitMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:visibility="gone"
+                        app:chipSpacingHorizontal="8dp"
+                        app:chipSpacingVertical="0dp"
+                        app:selectionRequired="true"
+                        app:singleSelection="true"
+                        tools:visibility="visible">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitEqual"
+                            style="@style/Widget.Review.Chip.Small"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:tag="equal"
+                            android:text="@string/split_equal" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitExact"
+                            style="@style/Widget.Review.Chip.Small"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:tag="exact"
+                            android:text="@string/split_exact"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitPercent"
+                            style="@style/Widget.Review.Chip.Small"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:tag="percent"
+                            android:text="@string/split_percent"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitWeight"
+                            style="@style/Widget.Review.Chip.Small"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:tag="weight"
+                            android:text="@string/split_weight"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <TextView
+                        android:id="@+id/textViewSplitModeHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/split_hint_equal"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonCustomizeSplit"
+                        style="@style/Widget.Mono.Button.Text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="44dp"
+                        android:paddingHorizontal="4dp"
+                        android:text="@string/split_customize"
+                        android:textAllCaps="false"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <!-- Solid = your share, hatched = what friends owe you. -->
+                    <LinearLayout
+                        android:id="@+id/splitShareBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="16dp"
+                        android:layout_marginTop="10dp"
+                        android:importantForAccessibility="noHideDescendants"
+                        android:orientation="horizontal"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <LinearLayout
+                        android:id="@+id/containerSplitAllocations"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/textViewSplitPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFeatureSettings="tnum"
+                        android:lineSpacingExtra="2dp"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:visibility="gone"
+                        tools:text="You: ₹1,200 · Dues: ₹2,400\nME: ₹1,200 · Rahul: ₹1,200 · Aisha: ₹1,200"
+                        tools:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/textSplitwisePushStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:text="Pushed · expense #123"
+                        tools:visibility="visible" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPushSplitwise"
+                        style="@style/Widget.Mono.Button.Yellow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/splitwise_push_one"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Note -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:labelFor="@id/editTextNotes"
+                android:text="@string/review_note"
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/textField_notes"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:hint="@string/notes">
+                android:layout_marginTop="6dp"
+                app:boxBackgroundColor="@color/mono_surface"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:boxStrokeWidth="0dp"
+                app:boxStrokeWidthFocused="1.5dp"
+                app:hintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/editTextNotes"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textMultiLine"
+                    android:hint="@string/review_note_hint"
+                    android:inputType="textMultiLine|textCapSentences"
                     android:maxLines="3"
-                    android:minLines="1" />
+                    android:minHeight="50dp"
+                    android:minLines="1"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
             </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonToggleMore"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="6dp"
-                android:gravity="start|center_vertical"
-                android:text="@string/add_split"
-                android:textAllCaps="false"
-                app:icon="@drawable/outline_add_notes_24" />
-
-            <LinearLayout
-                android:id="@+id/containerMoreDetails"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <com.google.android.material.card.MaterialCardView
-                    style="?attr/materialCardViewOutlinedStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="8dp">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPickSplitwiseGroup"
-                            style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:minHeight="48dp"
-                            android:paddingVertical="10dp"
-                            android:text="@string/splitwise_group_picker"
-                            android:textAllCaps="false" />
-
-                        <TextView
-                            android:id="@+id/textSplitMembersHint"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="@string/split_pick_group_first"
-                            android:textAppearance="?attr/textAppearanceBodySmall" />
-
-                        <TextView
-                            android:id="@+id/textSplitWithLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/split_with"
-                            android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/chipGroupParticipants"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:visibility="gone"
-                            app:chipSpacingHorizontal="4dp"
-                            app:chipSpacingVertical="0dp"
-                            app:singleSelection="false"
-                            tools:visibility="visible" />
-
-                        <TextView
-                            android:id="@+id/textSplitTypeLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/split_type"
-                            android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/chipGroupSplitMode"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:visibility="gone"
-                            app:chipSpacingHorizontal="4dp"
-                            app:selectionRequired="true"
-                            app:singleSelection="true"
-                            tools:visibility="visible">
-
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/chipSplitEqual"
-                                style="@style/Widget.Material3.Chip.Filter"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:checked="true"
-                                android:text="@string/split_equal"
-                                android:tag="equal" />
-
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/chipSplitExact"
-                                style="@style/Widget.Material3.Chip.Filter"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/split_exact"
-                                android:tag="exact"
-                                android:visibility="gone"
-                                tools:visibility="visible" />
-
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/chipSplitPercent"
-                                style="@style/Widget.Material3.Chip.Filter"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/split_percent"
-                                android:tag="percent"
-                                android:visibility="gone"
-                                tools:visibility="visible" />
-
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/chipSplitWeight"
-                                style="@style/Widget.Material3.Chip.Filter"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/split_weight"
-                                android:tag="weight"
-                                android:visibility="gone"
-                                tools:visibility="visible" />
-                        </com.google.android.material.chip.ChipGroup>
-
-                        <TextView
-                            android:id="@+id/textViewSplitModeHint"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="@string/split_hint_equal"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonCustomizeSplit"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginTop="0dp"
-                            android:minWidth="0dp"
-                            android:paddingHorizontal="4dp"
-                            android:text="@string/split_customize"
-                            android:textAllCaps="false"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-
-                        <LinearLayout
-                            android:id="@+id/containerSplitAllocations"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:orientation="vertical"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-
-                        <TextView
-                            android:id="@+id/textViewSplitPreview"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorPrimary"
-                            android:visibility="gone"
-                            tools:text="You: ₹25 · Dues: ₹75"
-                            tools:visibility="visible" />
-
-                        <TextView
-                            android:id="@+id/textSplitwisePushStatus"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:visibility="gone"
-                            tools:text="Pushed · expense #123"
-                            tools:visibility="visible" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonPushSplitwise"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/splitwise_push_one"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <com.google.android.material.card.MaterialCardView
+    <!-- Sticky actions -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        app:cardCornerRadius="0dp"
-        app:cardElevation="8dp">
+        android:background="?android:attr/colorBackground"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="14dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonSaveDraft"
+            style="@style/Widget.Mono.Button.Outlined"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp">
+            android:layout_marginEnd="10dp"
+            android:layout_weight="1"
+            android:text="@string/review_save_draft" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonSaveDraft"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/save_draft_short" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonSaveTransaction"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:text="@string/save_reviewed" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonSaveTransaction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.5"
+            android:text="@string/review_mark_reviewed" />
+    </LinearLayout>
+</LinearLayout>

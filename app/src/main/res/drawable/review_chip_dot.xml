@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Yellow dot on a selected category chip; inset so it stays 8dp at the chip's icon size. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="5dp">
+    <shape android:shape="oval">
+        <solid android:color="@color/mono_yellow" />
+        <size android:width="8dp" android:height="8dp" />
+    </shape>
+</inset>

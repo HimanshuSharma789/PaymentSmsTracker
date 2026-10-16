@@ -42,7 +42,7 @@ data class AppConfig(
      * Appearance: light | system | dynamic
      * dynamic = follow system day/night + Material You colors when available.
      */
-    val themeMode: String = ThemeMode.DYNAMIC,
+    val themeMode: String = ThemeMode.DEFAULT,
     /**
      * SMS senders containing any of these (case-insensitive) are read as bank SMS, live and in
      * backfill. Empty = accept every sender. Indian bank IDs look like "VM-HDFCBK", "AD-SBIUPI".
