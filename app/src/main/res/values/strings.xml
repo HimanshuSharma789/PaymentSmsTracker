@@ -479,6 +479,11 @@ Location is stored only on this phone and is never sent anywhere unless you turn
     <string name="agent_mono_reads_nothing">Reads nothing about your transactions.</string>
     <string name="agent_mono_and">and</string>
     <string name="agent_mono_never_sent">Never reference numbers or tokens. It can only propose; you apply.</string>
+
+    <!-- Mono: category suggestions -->
+    <string name="review_category_more">More</string>
+    <string name="review_category_all_cd">All categories</string>
+
     <!-- Play: disclosures -->
     <string name="disclosure_sms_title">Read your bank payment SMS</string>
     <string name="disclosure_sms_body">Payment SMS Tracker reads the SMS that banks and UPI apps send when money leaves or enters your account. It uses them to fill in the amount, merchant, date and account of each transaction for you to review.\n\n• Only messages from senders that look like banks are read; personal messages are skipped and never stored.\n• Transactions are saved only on this phone. They are not uploaded to us, and we don\'t run any server.\n• They leave the phone only if you choose to: pushing a split to Splitwise, or turning on AI Assist with your own API key.\n\nYou can turn this off any time in Android Settings → Apps → Payment SMS Tracker → Permissions.</string>

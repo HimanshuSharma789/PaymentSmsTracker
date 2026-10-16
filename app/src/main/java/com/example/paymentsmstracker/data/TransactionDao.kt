@@ -17,8 +17,13 @@ const val PENDING_SPLIT = """
       AND splitwiseExpenseId = 0
 """
 
+data class NameCount(val name: String, val n: Int)
+
 @Dao
 interface TransactionDao {
+
+    @Query("SELECT category AS name, COUNT(*) AS n FROM transactions WHERE transactionType = :type AND TRIM(category) != '' GROUP BY category ORDER BY n DESC")
+    suspend fun categoryUsage(type: String): List<NameCount>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long

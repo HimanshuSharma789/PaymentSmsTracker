@@ -23,7 +23,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
+import com.example.paymentsmstracker.review.CategorySuggestions
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
@@ -86,6 +88,7 @@ class TransactionEntryActivity : AppCompatActivity() {
     private lateinit var categoryHintText: TextView
     private lateinit var chipGroupCategory: ChipGroup
     private lateinit var chipGroupSubcategory: ChipGroup
+    private lateinit var scrollSubcategory: android.widget.HorizontalScrollView
     private lateinit var splitHeaderRow: View
     private lateinit var splitShareBar: LinearLayout
     private lateinit var buttonDeleteTransaction: View
@@ -125,6 +128,11 @@ class TransactionEntryActivity : AppCompatActivity() {
     private var selectedAccount: String = ""
     private var selectedType: String = "Expense"
     private var selectedCategory: String = ""
+    private var categoryOrder: List<String> = emptyList()
+    private var categoryOrderType = ""
+    private var categoryCounts: Map<String, Int> = emptyMap()
+    private var categoryCountsType = ""
+    private var categoryOrderCounts: Map<String, Int>? = null
     private var selectedSubcategory: String = ""
     private var selectedSplitMode: String = SplitMode.EQUAL
     private var customizeSplitExpanded: Boolean = false
@@ -160,6 +168,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         categoryHintText = findViewById(R.id.textCategoryHint)
         chipGroupCategory = findViewById(R.id.chipGroupCategory)
         chipGroupSubcategory = findViewById(R.id.chipGroupSubcategory)
+        scrollSubcategory = findViewById(R.id.scrollSubcategory)
         splitHeaderRow = findViewById(R.id.rowSplitHeader)
         splitShareBar = findViewById(R.id.splitShareBar)
         buttonDeleteTransaction = findViewById(R.id.buttonDeleteTransaction)
@@ -339,7 +348,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         OptionPickerBottomSheet.show(
             this,
             getString(if (isTransfer()) R.string.transfer_to else R.string.category),
-            options,
+            options.sortedBy { it.lowercase() },
             selectedCategory.ifBlank { null },
             spanCount = 2
         ) { value ->
@@ -406,10 +415,23 @@ class TransactionEntryActivity : AppCompatActivity() {
         imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
     }
 
+    private fun loadCategoryCountsIfNeeded() {
+        if (categoryCountsType == selectedType) return
+        val type = selectedType
+        categoryCountsType = type
+        categoryCounts = emptyMap()
+        lifecycleScope.launch {
+            val rows = withContext(Dispatchers.IO) { db.transactionDao().categoryUsage(type) }
+            if (categoryCountsType != type) return@launch
+            categoryCounts = rows.groupBy { it.name.trim().lowercase() }.mapValues { e -> e.value.sumOf { it.n } }
+            updatePickerLabels()
+        }
+    }
+
     private fun categoryOptionsForType(): List<String> = when (selectedType) {
         "Income" -> config.incomeCategories
         "Transfer-Out" -> config.accounts
-        else -> config.expenseCategories.keys.sorted()
+        else -> config.expenseCategories.keys.toList()
     }
 
     private fun updatePickerLabels() {
@@ -426,23 +448,49 @@ class TransactionEntryActivity : AppCompatActivity() {
         categoryTitleText.setText(if (transfer) R.string.transfer_to else R.string.category)
         val categories = categoryOptionsForType()
         categoryHintText.isVisible = categories.isEmpty()
+        loadCategoryCountsIfNeeded()
+        // Order is fixed per type/counts so tapping a visible chip never reshuffles the row.
+        val stale = categoryOrderType != selectedType || categoryOrderCounts !== categoryCounts ||
+            (selectedCategory.isNotBlank() && categories.any { it.equals(selectedCategory, true) } &&
+                categoryOrder.none { it.equals(selectedCategory, true) })
+        if (stale) {
+            categoryOrderType = selectedType
+            categoryOrderCounts = categoryCounts
+            categoryOrder = CategorySuggestions.pick(categories, categoryCounts, selectedCategory)
+        }
+        val shown = categoryOrder.filter { o -> categories.any { it.equals(o, true) } }
         // Same result as picking in the category sheet, minus the auto-advance.
-        bindChoiceChips(chipGroupCategory, categories, selectedCategory, small = false) { value ->
+        bindChoiceChips(chipGroupCategory, shown, selectedCategory, small = false) { value ->
             if (!value.equals(selectedCategory, ignoreCase = true)) {
                 selectedCategory = value
                 selectedSubcategory = ""
             }
             updatePickerLabels()
         }
+        if (categories.size > shown.size) {
+            val more = LayoutInflater.from(this)
+                .inflate(R.layout.item_review_chip, chipGroupCategory, false) as Chip
+            more.text = getString(R.string.review_category_more)
+            more.contentDescription = getString(R.string.review_category_all_cd)
+            more.isCheckable = false
+            more.setCloseIconResource(R.drawable.ic_mono_arrow_down)
+            more.isCloseIconVisible = true
+            more.setOnCloseIconClickListener { openCategoryPicker(advanceAfterSelect = false) }
+            more.setOnClickListener { openCategoryPicker(advanceAfterSelect = false) }
+            chipGroupCategory.addView(more)
+        }
         val subs = if (selectedType == "Expense") {
             config.expenseCategories[selectedCategory].orEmpty()
         } else {
             emptyList()
         }
-        chipGroupSubcategory.isVisible = subs.isNotEmpty()
+        scrollSubcategory.isVisible = subs.isNotEmpty()
         bindChoiceChips(chipGroupSubcategory, subs, selectedSubcategory, small = true) { value ->
             selectedSubcategory = value
             updatePickerLabels()
+        }
+        chipGroupSubcategory.children.firstOrNull { (it as? Chip)?.isChecked == true }?.let { c ->
+            scrollSubcategory.post { scrollSubcategory.smoothScrollTo((c.left - 24).coerceAtLeast(0), 0) }
         }
         merchantEditText.hint = getString(
             if (transfer) R.string.transfer_description_optional else R.string.merchant_name

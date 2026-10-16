@@ -262,15 +262,24 @@
                 app:chipSpacingHorizontal="8dp"
                 app:chipSpacingVertical="0dp" />
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chipGroupSubcategory"
+            <HorizontalScrollView
+                android:id="@+id/scrollSubcategory"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
+                android:clipToPadding="false"
+                android:scrollbars="none"
                 android:visibility="gone"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="0dp"
-                tools:visibility="visible" />
+                tools:visibility="visible">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupSubcategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="8dp"
+                    app:chipSpacingVertical="0dp"
+                    app:singleLine="true" />
+            </HorizontalScrollView>
 
             <!-- Account and type: tappable rows that open the existing pickers. -->
             <com.google.android.material.card.MaterialCardView
