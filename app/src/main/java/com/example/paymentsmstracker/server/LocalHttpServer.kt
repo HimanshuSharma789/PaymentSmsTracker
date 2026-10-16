@@ -2,6 +2,7 @@ package com.example.paymentsmstracker.server
 
 import android.content.Context
 import android.util.Log
+import com.example.paymentsmstracker.R
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import io.ktor.http.ContentType
@@ -63,8 +64,17 @@ class LocalHttpServer(private val appContext: Context) {
                 get("/app.js") {
                     call.serveAsset("lan_web/app.js", ContentType.Application.JavaScript)
                 }
+                get("/theme.js") {
+                    call.serveAsset("lan_web/theme.js", ContentType.Application.JavaScript)
+                }
                 get("/style.css") {
                     call.serveAsset("lan_web/style.css", ContentType.Text.CSS)
+                }
+                get("/outfit.ttf") {
+                    val font = withContext(Dispatchers.IO) {
+                        appContext.resources.openRawResource(R.font.outfit_variable).use { it.readBytes() }
+                    }
+                    call.respondBytes(font, ContentType("font", "ttf"))
                 }
                 get("/sheet") {
                     call.serveAsset("lan_web/sheet.html", ContentType.Text.Html)

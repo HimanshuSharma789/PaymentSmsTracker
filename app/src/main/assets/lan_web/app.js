@@ -86,6 +86,8 @@
     editView.hidden = view !== "edit";
   }
 
+  const STATUS_LABEL = { needs_review: "To review", reviewed: "Reviewed", exported: "Sent to MM" };
+
   function money(n) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(n || 0);
   }
@@ -405,7 +407,7 @@
         ? `${tx.account || "?"} → ${tx.category || "?"}`
         : ([tx.account, tx.category].filter(Boolean).join(" · ") || "Uncategorized");
       const st = tx.reviewStatus || "needs_review";
-      const status = currentFilter ? "" : `<div class="status ${escapeHtml(st)}">${escapeHtml(st)}</div>`;
+      const status = currentFilter ? "" : `<div class="status ${escapeHtml(st)}">${escapeHtml(STATUS_LABEL[st] || st)}</div>`;
       const checked = selectedIds.has(String(tx.id));
       const check = selectMode
         ? `<input type="checkbox" class="itemCheck" ${checked ? "checked" : ""} aria-label="Select" />`
@@ -417,7 +419,7 @@
           <div class="meta"><span class="typePill ${escapeHtml(type)}">${escapeHtml(type)}</span> · ${escapeHtml(metaLine)} · ${ymd(tx.timestamp)} ${formatTime(tx.timestamp)}</div>
         </div>
         <div>
-          <div class="amount">${money(tx.amount)}</div>
+          <div class="amount"><span class="cur">₹</span>${money(tx.amount).replace("₹", "")}</div>
           ${status}
         </div>
       </article>`;
