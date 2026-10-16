@@ -557,9 +557,9 @@
         <td><select data-field="subcategory" ${transfer ? "disabled" : ""}>${optionList(subs, transfer ? "" : (tx.subcategory || ""), true)}</select></td>
         <td>
           <select data-field="reviewStatus">
-            <option value="needs_review" ${st === "needs_review" ? "selected" : ""}>needs_review</option>
-            <option value="reviewed" ${st === "reviewed" ? "selected" : ""}>reviewed</option>
-            <option value="exported" ${st === "exported" ? "selected" : ""}>exported</option>
+            <option value="needs_review" ${st === "needs_review" ? "selected" : ""}>To review</option>
+            <option value="reviewed" ${st === "reviewed" ? "selected" : ""}>Reviewed</option>
+            <option value="exported" ${st === "exported" ? "selected" : ""}>Sent to MM</option>
           </select>
         </td>
         <td class="notesCell"><input data-field="notes" value="${escapeHtml(tx.notes || "")}" /></td>
