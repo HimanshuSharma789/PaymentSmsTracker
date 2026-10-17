@@ -14,6 +14,11 @@
         app:cardElevation="0dp"
         app:strokeWidth="0dp">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
         <TextView
             android:id="@+id/textAgentMessage"
             android:layout_width="wrap_content"
@@ -24,5 +29,15 @@
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textIsSelectable="true"
             tools:text="Found 4 pending transactions." />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonReportResponse"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/report_response"
+            android:visibility="gone" />
+        </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </FrameLayout>
