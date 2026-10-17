@@ -13,9 +13,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        // ONE-LINE CHANGE before the first Play upload: Play rejects com.example.* ids, and the id
-        // can never change after publishing. FileProvider authority follows via ${applicationId}.
-        applicationId = "com.example.paymentsmstracker"
+        // Permanent once published to Play. namespace stays com.example.* because `in` is a Kotlin keyword.
+        // FileProvider authority follows via ${applicationId}.
+        applicationId = "in.nerdgeek404.paymentsmstracker"
         minSdk = 26
         targetSdk = 36
         // Single source of the version. Bump versionCode by 1 for every upload to any Play track.
