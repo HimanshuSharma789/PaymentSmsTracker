@@ -1,6 +1,6 @@
 # Architecture
 
-Android app, package `com.example.paymentsmstracker`, minSdk 26, target/compile 35, version **1.3.0**. Kotlin, AppCompat/Material XML screens (Compose plugin is on the module but the product UI is Views). Room + KSP. Tests under `app/src/test`.
+Android app, package `com.example.paymentsmstracker`, minSdk 26, target/compile 36 (Play floor since 2025-08-31), version **1.3.0**. Kotlin, AppCompat/Material XML screens (Compose plugin is on the module but the product UI is Views). Room + KSP. Tests under `app/src/test`.
 
 ## Layers
 
