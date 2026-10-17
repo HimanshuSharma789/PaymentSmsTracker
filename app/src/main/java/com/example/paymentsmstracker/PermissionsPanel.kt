@@ -42,12 +42,15 @@ class PermissionsPanel(private val activity: AppCompatActivity, root: View) {
         }
 
     init {
-        smsButton.setOnClickListener { requestOrManage(SMS_PERMISSIONS) }
+        smsButton.setOnClickListener {
+            if (allGranted(SMS_PERMISSIONS)) openAppSettings()
+            else Disclosures.sms(activity) { launcher.launch(SMS_PERMISSIONS) }
+        }
         notificationsButton.setOnClickListener { requestOrManage(notificationPermissions()) }
         // Foreground location only (no ACCESS_BACKGROUND_LOCATION in the manifest, Play policy).
         locationButton.setOnClickListener {
             if (LocationCapture.hasForegroundPermission(activity)) openAppSettings()
-            else launcher.launch(FOREGROUND_LOCATION)
+            else Disclosures.location(activity) { launcher.launch(FOREGROUND_LOCATION) }
         }
     }
 

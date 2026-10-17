@@ -186,6 +186,7 @@ class AdminActivity : AppCompatActivity() {
         panelPermissions = findViewById(R.id.panelPermissions)
         panelAi = findViewById(R.id.panelAi)
         permissionsPanel = PermissionsPanel(this, panelPermissions)
+        findViewById<View>(R.id.buttonPrivacyPolicy).setOnClickListener { Disclosures.openPrivacyPolicy(this) }
         chipGroupThemeMode = findViewById(R.id.chipGroupThemeMode)
         textThemeModeHint = findViewById(R.id.textThemeModeHint)
         chipGroupLanDuration = findViewById(R.id.chipGroupLanDuration)
@@ -439,7 +440,15 @@ class AdminActivity : AppCompatActivity() {
         }
         findViewById<MaterialSwitch>(R.id.switchAiEnabled).apply {
             isChecked = settings.enabled
-            setOnCheckedChangeListener { _, checked -> settings.enabled = checked }
+            setOnCheckedChangeListener { _, checked ->
+                if (checked && !settings.enabled) {
+                    Disclosures.aiConsent(this@AdminActivity, onCancel = { isChecked = false }) {
+                        settings.enabled = true
+                    }
+                } else if (!checked) {
+                    settings.enabled = false
+                }
+            }
         }
         val p = settings.privacy
         listOf<Triple<Int, Boolean, (AgentPrivacy, Boolean) -> AgentPrivacy>>(
@@ -1070,7 +1079,7 @@ class AdminActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            requestReadSmsLauncher.launch(Manifest.permission.READ_SMS)
+            Disclosures.sms(this) { requestReadSmsLauncher.launch(Manifest.permission.READ_SMS) }
         } else {
             confirmBackfill()
         }

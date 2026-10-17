@@ -131,18 +131,22 @@ class AgentChatActivity : AppCompatActivity() {
                 is ChatItem.UserText -> bindMessage(holder.itemView, item.text, Gravity.END,
                     com.google.android.material.R.attr.colorPrimaryContainer)
                 is ChatItem.AssistantText -> bindMessage(holder.itemView, item.text, Gravity.START,
-                    com.google.android.material.R.attr.colorSurfaceVariant)
+                    com.google.android.material.R.attr.colorSurfaceVariant, reportable = true)
                 is ChatItem.Error -> bindMessage(holder.itemView, item.text, Gravity.START,
                     com.google.android.material.R.attr.colorErrorContainer)
                 is ChatItem.Card -> bindCard(holder.itemView, item)
             }
         }
 
-        private fun bindMessage(view: View, text: String, gravity: Int, colorAttr: Int) {
+        private fun bindMessage(view: View, text: String, gravity: Int, colorAttr: Int, reportable: Boolean = false) {
             val card = view.findViewById<MaterialCardView>(R.id.cardAgentMessage)
             (card.layoutParams as FrameLayout.LayoutParams).gravity = gravity
             card.setCardBackgroundColor(MaterialColors.getColor(card, colorAttr))
             view.findViewById<TextView>(R.id.textAgentMessage).text = text
+            view.findViewById<MaterialButton>(R.id.buttonReportResponse).apply {
+                visibility = if (reportable) View.VISIBLE else View.GONE
+                setOnClickListener { Disclosures.reportResponse(context, text) }
+            }
         }
 
         private fun bindCard(view: View, card: ChatItem.Card) {
