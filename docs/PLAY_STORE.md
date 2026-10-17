@@ -26,7 +26,7 @@ These were checked and are already correct, so nothing changed:
 
 ## 2. Owner decisions and to-dos
 
-### D1. applicationId (required, one line)
+### D1. applicationId (done: `in.nerdgeek404.paymentsmstracker`)
 `app/build.gradle.kts` → `defaultConfig { applicationId = "…" }`. **Play rejects any id that starts with `com.example`**, and the id can never change after the first upload. Leave `namespace` and the Kotlin packages as they are. The FileProvider authority follows automatically through `${applicationId}`. The OAuth scheme `paymentsmstracker://oauth/splitwise` does not depend on the id.
 
 ### D2. Upload key and signing (Play App Signing is mandatory for new apps)
