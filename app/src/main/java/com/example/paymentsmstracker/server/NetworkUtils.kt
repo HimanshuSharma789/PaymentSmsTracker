@@ -44,7 +44,9 @@ object NetworkUtils {
             ?: return null
         val ip = wm.connectionInfo?.ipAddress ?: return null
         if (ip == 0) return null
+        // Locale.ROOT: in e.g. Arabic locales %d would print non-ASCII digits and break the URL.
         return String.format(
+            java.util.Locale.ROOT,
             "%d.%d.%d.%d",
             ip and 0xff,
             ip shr 8 and 0xff,

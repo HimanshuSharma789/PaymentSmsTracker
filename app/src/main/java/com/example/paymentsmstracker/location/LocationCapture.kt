@@ -15,7 +15,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
-/** Best-effort device location for tagging SMS transactions. Null when permission is off or no fix. */
+/**
+ * Best-effort device location for tagging SMS transactions. Null when permission is off or no fix.
+ * Foreground permission only: SMS that arrive while the app is not in use get no location.
+ */
 object LocationCapture {
 
     private const val TAG = "LocationCapture"
@@ -25,10 +28,6 @@ object LocationCapture {
     fun hasForegroundPermission(context: Context): Boolean =
         granted(context, Manifest.permission.ACCESS_FINE_LOCATION) ||
             granted(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-
-    fun hasBackgroundPermission(context: Context): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-            granted(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
 
     // ponytail: reuses a last-known fix up to 5 min old; request a fresh fix every time if that proves too stale.
     suspend fun current(context: Context): Location? {

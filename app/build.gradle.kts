@@ -7,13 +7,18 @@ plugins {
 }
 
 android {
+    // Kotlin/R package only; Play never sees it. Leave as-is when choosing the store id.
     namespace = "com.example.paymentsmstracker"
-    compileSdk = 35
+    // Play: new apps and updates must target API 36 since 2025-08-31 (extension to 2026-11-01).
+    compileSdk = 36
 
     defaultConfig {
+        // ONE-LINE CHANGE before the first Play upload: Play rejects com.example.* ids, and the id
+        // can never change after publishing. FileProvider authority follows via ${applicationId}.
         applicationId = "com.example.paymentsmstracker"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
+        // Single source of the version. Bump versionCode by 1 for every upload to any Play track.
         versionCode = 3
         versionName = "1.3.0"
 
