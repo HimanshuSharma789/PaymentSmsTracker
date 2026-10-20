@@ -27,6 +27,7 @@
     <color name="mono_on_ink">#FFFFFF</color>
     <color name="mono_meta">#63635E</color>
     <color name="mono_line">#DEDBD3</color>
+    <color name="mono_surface_soft">#8CFFFFFF</color>
     <color name="mono_yellow">#FFD23F</color>
     <!-- Text on the yellow accent stays dark in both themes. -->
     <color name="mono_on_yellow">#121212</color>
