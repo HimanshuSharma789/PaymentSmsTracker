@@ -208,6 +208,17 @@
     const el = document.getElementById("filterCount");
     if (!el) return;
     el.textContent = shown === total ? `${total} shown` : `${shown} of ${total}`;
+    const st = document.getElementById("stShown");
+    if (st) st.textContent = String(shown);
+  }
+
+  async function refreshStats() {
+    try {
+      const all = (await api("/api/transactions")).items || [];
+      const n = (k) => all.filter((tx) => (tx.reviewStatus || "needs_review") === k).length;
+      document.getElementById("stReview").textContent = String(n("needs_review"));
+      document.getElementById("stReviewed").textContent = String(n("reviewed"));
+    } catch (_) { /* keep previous numbers */ }
   }
 
   function refreshBulkBar() {
@@ -921,6 +932,7 @@
     });
     renderSheet();
     refreshStatus();
+    refreshStats();
   }
 
   async function enterApp() {
