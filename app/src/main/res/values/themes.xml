@@ -14,6 +14,7 @@
         <item name="colorOnTertiary">@color/mono_on_yellow</item>
         <item name="colorError">@color/mono_error</item>
         <item name="android:colorBackground">@color/mono_bg</item>
+        <item name="android:windowBackground">@color/mono_bg</item>
         <item name="colorOnBackground">@color/mono_ink</item>
         <item name="colorSurface">@color/mono_bg</item>
         <item name="colorOnSurface">@color/mono_ink</item>
