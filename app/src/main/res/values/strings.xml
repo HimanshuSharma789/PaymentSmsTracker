@@ -453,8 +453,10 @@ Location is stored only on this phone and is never sent anywhere unless you turn
     <string name="splits_mono_mark_selected_added">Already added</string>
     <string name="splits_mono_push_cd">Push %1$s to Splitwise</string>
     <string name="splits_mono_mark_added_cd">Mark %1$s as already added to Splitwise</string>
-    <string name="splits_mono_connected">Splitwise connected</string>
-    <string name="splits_mono_not_connected">Splitwise not connected</string>
+    <string name="splits_mono_connected">Connected as %1$s</string>
+    <string name="splits_mono_connected_anon">Connected</string>
+    <string name="splits_mono_connect">Connect Splitwise</string>
+    <string name="splits_mono_not_connected">Not connected</string>
     <string name="splits_mono_to_push">%1$d to push</string>
     <string name="splits_mono_all_pushed">All on Splitwise</string>
     <string name="splits_mono_on_splitwise">On Splitwise</string>

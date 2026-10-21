@@ -27,6 +27,7 @@ import com.example.paymentsmstracker.split.SplitCalculator
 import com.example.paymentsmstracker.split.SplitMode
 import com.example.paymentsmstracker.splitwise.SplitwiseApi
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
+import com.example.paymentsmstracker.splitwise.SplitwiseOAuthActivity
 import com.example.paymentsmstracker.splitwise.SplitwisePusher
 import com.example.paymentsmstracker.splitwise.SplitwiseSessionEvents
 import com.example.paymentsmstracker.ui.HatchDrawable
@@ -398,10 +399,27 @@ class SplitsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        findViewById<TextView>(R.id.textSplitsConnection).setText(
-            if (SplitwiseAuthStore(this).load().isSignedIn) R.string.splits_mono_connected
-            else R.string.splits_mono_not_connected
-        )
+        val auth = SplitwiseAuthStore(this).load()
+        val on = auth.isSignedIn
+        findViewById<TextView>(R.id.textSplitsConnection).apply {
+            text = when {
+                !on -> getString(R.string.splits_mono_not_connected)
+                auth.currentUserName.isBlank() -> getString(R.string.splits_mono_connected_anon)
+                else -> getString(R.string.splits_mono_connected, auth.currentUserName)
+            }
+            setCompoundDrawablesRelativeWithIntrinsicBounds(
+                if (on) R.drawable.bg_mono_dot_solid else R.drawable.bg_mono_dot_hollow, 0, 0, 0
+            )
+        }
+        findViewById<View>(R.id.buttonSplitsConnect).apply {
+            visibility = if (on) View.GONE else View.VISIBLE
+            setOnClickListener {
+                startActivity(
+                    Intent(this@SplitsActivity, AdminActivity::class.java)
+                        .putExtra(SplitwiseOAuthActivity.EXTRA_OPEN_SPLITWISE_TAB, true)
+                )
+            }
+        }
     }
 
     // ---- Mono presentation ----
@@ -478,7 +496,7 @@ class SplitsActivity : AppCompatActivity() {
     private fun updateSelectionChrome() {
         findViewById<View>(R.id.cardSplitsBulk).visibility =
             if (selectionModeActive) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.textSplitsConnection).visibility =
+        findViewById<View>(R.id.rowSplitsConnection).visibility =
             if (selectionModeActive) View.GONE else View.VISIBLE
         supportActionBar?.setHomeAsUpIndicator(R.drawable.outline_arrow_back_24)
         supportActionBar?.setDisplayHomeAsUpEnabled(selectionModeActive)
