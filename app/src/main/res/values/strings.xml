@@ -505,4 +505,14 @@ Location is stored only on this phone and is never sent anywhere unless you turn
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
+    <!-- Mono: list search/sort -->
+    <string name="list_search_hint">Search merchant, amount, notes…</string>
+    <string name="list_search_clear">Clear search</string>
+    <string name="list_sort">Sort</string>
+    <string name="list_sort_newest">Newest first</string>
+    <string name="list_sort_oldest">Oldest first</string>
+    <string name="list_sort_amount_high">Amount: high to low</string>
+    <string name="list_sort_amount_low">Amount: low to high</string>
+    <string name="list_sort_merchant">Merchant A–Z</string>
+    <string name="list_empty_search">No matches for “%1$s”</string>
 </resources>
