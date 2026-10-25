@@ -74,6 +74,11 @@ class SplitwiseWebAuthActivity : AppCompatActivity() {
             }
         }
 
+        if (savedInstanceState != null) {
+            // Recreation (rotation, theme, process death): keep the loaded form and its cookies.
+            webView.restoreState(savedInstanceState)
+            return
+        }
         val oauthMode = intent.getBooleanExtra(EXTRA_OAUTH_MODE, false)
         val startUrl = if (oauthMode && store.load().isOAuthConfigured) {
             val api = SplitwiseApi.from(store)
@@ -83,7 +88,19 @@ class SplitwiseWebAuthActivity : AppCompatActivity() {
         } else {
             SplitwiseApi.LOGIN_URL
         }
-        webView.loadUrl(startUrl)
+        // Fresh sign-in only: stale cookies or a stale stored CSRF token make Splitwise reject the
+        // login form with "invalid authorization token". Keeps OAuth client id/secret.
+        store.clearWebSession()
+        webView.clearCache(true)
+        cookieManager.removeAllCookies {
+            cookieManager.flush()
+            if (!isDestroyed && !isFinishing) webView.loadUrl(startUrl)
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
     }
 
     private fun handleUrl(uri: Uri): Boolean {
