@@ -1,5 +1,6 @@
 package com.example.paymentsmstracker.adapter
 
+import com.example.paymentsmstracker.home.Money
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -119,7 +120,7 @@ class TransactionAdapter(
         fun bind(transaction: Transaction) {
             merchantTextView.text = transaction.merchantName
             val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            amountTextView.text = currencyFormat.format(transaction.amount)
+            amountTextView.text = Money.styled(currencyFormat.format(transaction.amount))
             val type = MoneyManagerExporter.normalizeType(transaction.transactionType)
             amountTextView.setTextColor(
                 when (type) {

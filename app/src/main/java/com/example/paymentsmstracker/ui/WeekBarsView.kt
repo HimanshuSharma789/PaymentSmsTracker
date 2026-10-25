@@ -75,7 +75,7 @@ class WeekBarsView @JvmOverloads constructor(
             rect.set(cx - barW / 2f, bottom - h, cx + barW / 2f, bottom)
             if (i == selected) {
                 canvas.drawRoundRect(rect, 9f * d, 9f * d, solid)
-                val tag = Money.format(day.amount)
+                val tag = Money.format(day.amount).replace("₹", "₹\u2009")
                 val tw = tagText.measureText(tag) + 18f * d
                 val tl = (cx - tw / 2f).coerceIn(0f, width - tw)
                 val tr = RectF(tl, rect.top - tagH - 6f * d, tl + tw, rect.top - 6f * d)

@@ -521,10 +521,10 @@ class SplitsActivity : AppCompatActivity() {
             view.findViewById<TextView>(R.id.textSplitMeta).text =
                 listOf(row.date, tx.account, category, mode).filter { it.isNotBlank() }.joinToString(" · ")
         }
-        view.findViewById<TextView>(R.id.textSplitTotal).text = money(BigDecimal(row.total))
+        view.findViewById<TextView>(R.id.textSplitTotal).text = Money.styled(money(BigDecimal(row.total)))
         view.findViewById<TextView>(R.id.textSplitBreakdown).text =
             if (friends.isEmpty()) row.people
-            else friends.entries.joinToString(" · ") { "${displayName(it.key)} ${money(it.value)}" }
+            else friends.entries.joinToString(" · ") { "${displayName(it.key)} ${money(it.value)}" }.let { Money.styled(it) }
 
         // Your share solid, each friend's share hatched (still to come back to you).
         val bar = view.findViewById<LinearLayout>(R.id.splitsSegments)
