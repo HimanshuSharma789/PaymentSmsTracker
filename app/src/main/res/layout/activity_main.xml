@@ -127,7 +127,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/mono_review"
-                    android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+                    android:fontFamily="@font/outfit_700" android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
                 <TextView
                     android:id="@+id/textHomeLeft"

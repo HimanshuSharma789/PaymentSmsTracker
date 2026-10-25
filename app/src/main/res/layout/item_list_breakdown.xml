@@ -29,6 +29,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textAppearance="?attr/textAppearanceBodyLarge"
+            android:fontFamily="@font/outfit_500"
             android:textFontWeight="500"
             tools:ignore="UnusedAttribute"
             tools:text="Food" />
