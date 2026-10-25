@@ -115,6 +115,15 @@ class SplitwiseAuthStore(context: Context) {
         clearWebViewCookies()
     }
 
+    /** Drops only the stored web session (cookies + CSRF); keeps OAuth app credentials and tokens. */
+    fun clearWebSession() {
+        secure.edit()
+            .remove(KEY_SESSION_COOKIE)
+            .remove(KEY_USER_CREDENTIALS)
+            .remove(KEY_CSRF_TOKEN)
+            .apply()
+    }
+
     fun signOut() {
         clearExpiredSession()
         prefs.edit()
