@@ -72,7 +72,7 @@ class LocalHttpServer(private val appContext: Context) {
                 }
                 get("/outfit.ttf") {
                     val font = withContext(Dispatchers.IO) {
-                        appContext.resources.openRawResource(R.font.outfit_variable).use { it.readBytes() }
+                        appContext.resources.openRawResource(R.raw.outfit_variable).use { it.readBytes() }
                     }
                     call.respondBytes(font, ContentType("font", "ttf"))
                 }
