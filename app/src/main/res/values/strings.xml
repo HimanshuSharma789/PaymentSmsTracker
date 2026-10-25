@@ -17,7 +17,6 @@
     <string name="mono_week_total">%1$s total</string>
     <string name="mono_review">Review</string>
     <string name="mono_review_hint">Tap the circle to confirm a guess</string>
-    <string name="mono_left">%1$d left</string>
     <string name="mono_review_empty">Nothing to review. New payment SMS land here.</string>
     <string name="mono_see_all_review">See all %1$d to review</string>
     <string name="mono_choose">Choose</string>
@@ -33,6 +32,7 @@
     <string name="mono_splits_none">No shared bills waiting</string>
     <string name="mono_add">Add a payment by hand</string>
     <string name="mono_settings">Settings</string>
+    <string name="mono_left">%1$d left</string>
     <string name="home_whats_left">What&#8217;s left</string>
     <string name="home_summary">%1$d to review · %2$d ready for Money Manager · %3$d splits pending</string>
     <string name="home_summary_caught_up">You&#8217;re caught up</string>
@@ -267,7 +267,6 @@
     <string name="list_count_to_review">%1$d to review</string>
     <string name="list_count_reviewed">%1$d reviewed</string>
     <string name="list_count_exported">%1$d exported</string>
-    <string name="list_count_items">%1$d items</string>
     <string name="export_splits_only">Export Split Ledger CSV</string>
     <string name="clear_all_transactions">Clear All Transactions</string>
     <string name="filter_needs_review">Needs review</string>
@@ -502,4 +501,8 @@ Location is stored only on this phone and is never sent anywhere unless you turn
     <string name="report_subject" translatable="false">AI Assist response report</string>
     <!-- TODO: set the developer email that receives AI response reports; empty falls back to a share chooser -->
     <string name="report_email" translatable="false"></string>
+    <plurals name="list_count_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
 </resources>
