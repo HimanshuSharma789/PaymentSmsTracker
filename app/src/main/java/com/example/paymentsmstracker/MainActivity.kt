@@ -155,8 +155,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             textDelta.visibility = View.VISIBLE
             textDelta.text = when (diff.signum()) {
-                -1 -> getString(R.string.mono_vs_last_less, Money.format(diff.abs()), lastMonth)
-                1 -> getString(R.string.mono_vs_last_more, Money.format(diff), lastMonth)
+                -1 -> getString(R.string.mono_vs_last_less, Money.format(diff.abs()), lastMonth).let { Money.styled(it) }
+                1 -> getString(R.string.mono_vs_last_more, Money.format(diff), lastMonth).let { Money.styled(it) }
                 else -> getString(R.string.mono_vs_last_same, lastMonth)
             }
             textDelta.setCompoundDrawablesRelativeWithIntrinsicBounds(
@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
 
         weekBars.setDays(s.lastSevenDays)
         val weekTotal = s.lastSevenDays.fold(java.math.BigDecimal.ZERO) { acc, d -> acc + d.amount }
-        textWeekTotal.text = getString(R.string.mono_week_total, Money.format(weekTotal))
+        textWeekTotal.text = Money.styled(getString(R.string.mono_week_total, Money.format(weekTotal)))
 
         textReadyTotal.text = Money.hero(s.readyTotal, 0.6f)
         textReadySub.text = if (s.readyCount > 0) {
@@ -207,7 +207,7 @@ class MainActivity : AppCompatActivity() {
         val category = listOf(tx.category, tx.subcategory).filter { it.isNotBlank() }.joinToString(" / ")
         row.findViewById<TextView>(R.id.textReviewMeta).text =
             listOf(tx.account, category.ifBlank { "No guess yet" }).filter { it.isNotBlank() }.joinToString(" · ")
-        row.findViewById<TextView>(R.id.textReviewAmount).text = Money.format(tx.amount)
+        row.findViewById<TextView>(R.id.textReviewAmount).text = Money.styled(Money.format(tx.amount))
         row.setOnClickListener { openEntry(tx.id) }
 
         val confirm = row.findViewById<ImageButton>(R.id.buttonReviewConfirm)

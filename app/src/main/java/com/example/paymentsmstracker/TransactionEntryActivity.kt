@@ -810,6 +810,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 )
             }
         }
+        splitPreviewText.text = Money.styled(splitPreviewText.text)
     }
 
     /** Solid segment for your share, hatched for each friend's. */

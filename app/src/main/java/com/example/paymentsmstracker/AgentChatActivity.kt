@@ -221,8 +221,9 @@ class AgentChatActivity : AppCompatActivity() {
                 SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.getDefault()).format(Date(p.tx.timestamp)),
                 p.tx.account
             ).filter { it.isNotBlank() }.joinToString(" · ")
-            view.findViewById<TextView>(R.id.textProposalAmount).text =
+            view.findViewById<TextView>(R.id.textProposalAmount).text = Money.styled(
                 Money.format(java.math.BigDecimal.valueOf(p.tx.amount), withPaise = p.tx.amount % 1.0 != 0.0)
+            )
             view.findViewById<TextView>(R.id.textProposalDiff).text = buildList {
                 s.diff().forEach { (label, before, after) -> add("$label: $before → $after") }
                 if (p.markReviewed && p.tx.reviewStatus == ReviewStatus.NEEDS_REVIEW) add(ctx.getString(R.string.agent_chat_mark_reviewed))
@@ -260,7 +261,7 @@ class AgentChatActivity : AppCompatActivity() {
         }
 
         private fun TextView.showText(value: String?) {
-            text = value
+            text = value?.let { Money.styled(it) }
             visibility = if (value == null) View.GONE else View.VISIBLE
         }
 
