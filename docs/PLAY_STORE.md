@@ -11,7 +11,7 @@ Status as of 2026-10-16, branch `release/play-store`. Policy facts were checked 
 | Release logging | The R8 rule now uses `return 0`, so `Log.v/d/i` calls are removed even when their Int result is used (for example a `Log.d` as a `when` branch). Before this, strings like "Ignored SMS: …" were still in the release dex. Verified with `strings` on the dex. | `app/proguard-rules.pro` |
 | Locale bug | The LAN address was built with `String.format` in the default locale, which prints non-ASCII digits in Arabic and similar locales and breaks the URL. It now uses `Locale.ROOT`. | `server/NetworkUtils.kt` |
 | Dependencies | `security-crypto` `1.1.0-alpha06` → `1.1.0` (stable). | `gradle/libs.versions.toml` |
-| CI | Runs `testDebugUnitTest lintRelease assembleDebug bundleRelease`. Uploads the unsigned AAB with `mapping.txt`, and uploads reports every time. | `.github/workflows/ci.yml` |
+| CI | Runs `testDebugUnitTest lintRelease assembleDebug bundleRelease`. Checks only: the release bundle is unsigned and not published; reports are uploaded on failure (7 days). | `.github/workflows/ci.yml` |
 | Docs | SDK level in ARCHITECTURE, link from INDEX. | `docs/` |
 
 These were checked and are already correct, so nothing changed:
@@ -196,3 +196,11 @@ unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E '\.so$|progu
 3. Upload to internal testing, install from Play, and send a real bank SMS.
 4. If any data flow changed, update Data safety, the privacy policy and the SMS declaration.
 5. Do a staged rollout and watch Android vitals for 48 h.
+
+## 11. Releasing (GitHub)
+1. Bump `versionName` and `versionCode` in `app/build.gradle.kts` and merge to `master`.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` triggers `.github/workflows/release.yml`. It fails if the tag differs from `versionName`. It builds a signed APK and AAB plus the R8 `mapping.txt`, and attaches them to the GitHub release (created if missing).
+3. To attach builds to an older tag: Actions → Release → Run workflow, enter the tag, and tick `skip_version_check` for tags made before the version was bumped.
+4. Repository secrets used: `ANDROID_KEYSTORE_BASE64` (the upload `.jks`, base64), `KEYSTORE_PASSWORD` (keystore password), `KEY_ALIAS` (key alias), `KEY_PASSWORD` (key password).
+
+Pull requests and pushes to `master`/`dev` only run `ci.yml` (tests, lint, unsigned build check). They never receive the secrets and publish nothing.
