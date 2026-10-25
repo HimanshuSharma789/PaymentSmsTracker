@@ -16,13 +16,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
-import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.location.LocationCapture
-import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.sms.ParsedSms
-import com.example.paymentsmstracker.sms.SmsDedupe
-import com.example.paymentsmstracker.sms.SmsParser
+import com.example.paymentsmstracker.sms.SmsIngest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +39,7 @@ class SmsReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val body = messages.joinToString(separator = "") { it.messageBody ?: "" }
+        val sender = messages.firstOrNull()?.originatingAddress
         if (body.isBlank()) {
             pendingResult.finish()
             return
@@ -53,7 +51,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                handleMessage(context.applicationContext, body, receivedAtMs)
+                handleMessage(context.applicationContext, body, receivedAtMs, sender)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to handle SMS", e)
             } finally {
@@ -65,57 +63,27 @@ class SmsReceiver : BroadcastReceiver() {
     private suspend fun handleMessage(
         context: Context,
         messageBody: String,
-        receivedAtMs: Long
+        receivedAtMs: Long,
+        sender: String?
     ) {
         val config = ConfigStore(context).load()
-        val parser = SmsParser(config)
-        val parsed = parser.parse(messageBody, receivedAtMs = receivedAtMs) ?: run {
-            Log.d(tag, "SMS did not match payment patterns")
-            return
-        }
-
-        val dao = AppDatabase.getDatabase(context).transactionDao()
-        if (SmsDedupe.isDuplicate(dao, messageBody, parsed, config.dedupeWindowMinutes)) {
-            Log.i(tag, "Skipping duplicate SMS ref=${parsed.referenceNumber}")
-            return
-        }
-
-        val db = AppDatabase.getDatabase(context)
-        val hint = MerchantMemory.lookup(db, parsed.merchantName)
-        val filled = MerchantMemory.applyToBlankFields(
-            category = "",
-            subcategory = "",
-            account = parsed.account,
-            transactionType = parsed.transactionType,
-            hint = hint
+        val outcome = SmsIngest.ingest(
+            db = AppDatabase.getDatabase(context),
+            config = config,
+            body = messageBody,
+            receivedAtMs = receivedAtMs,
+            sender = sender,
+            insert = config.autoSaveFromSms,
+            location = { LocationCapture.current(context) }
         )
-
-        val location = LocationCapture.current(context)
-        val transaction = Transaction(
-            amount = parsed.amount,
-            merchantName = parsed.merchantName,
-            category = filled.category,
-            subcategory = filled.subcategory,
-            account = filled.account,
-            notes = null,
-            timestamp = parsed.timestamp,
-            originalSms = messageBody,
-            isExpense = parsed.isExpense,
-            referenceNumber = parsed.referenceNumber,
-            participants = "",
-            reviewStatus = ReviewStatus.NEEDS_REVIEW,
-            transactionType = parsed.transactionType,
-            latitude = location?.latitude,
-            longitude = location?.longitude
-        )
-
-        val id = if (config.autoSaveFromSms) {
-            dao.insertTransaction(transaction)
-        } else {
-            0L
+        when (outcome) {
+            is SmsIngest.Outcome.Accepted -> showNotification(
+                context, outcome.transaction, outcome.parsed, messageBody, outcome.id,
+                outcome.transaction.account
+            )
+            is SmsIngest.Outcome.Duplicate -> Log.i(tag, "Skipping duplicate SMS")
+            else -> Log.d(tag, "Ignored SMS: $outcome")
         }
-
-        showNotification(context, transaction, parsed, messageBody, id, filled.account)
     }
 
     private fun showNotification(
@@ -164,7 +132,7 @@ class SmsReceiver : BroadcastReceiver() {
             SimpleDateFormat("dd MMM yyyy · h:mm a", Locale.getDefault())
                 .format(Date(parsed.timestamp))
         val contentText =
-            "₹${parsed.amount} at ${parsed.merchantName} on $formattedDate. Tap to review."
+            "₹${"%,.2f".format(parsed.amount)} at ${parsed.merchantName} on $formattedDate. Tap to review."
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.baseline_sms_24)

@@ -23,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
@@ -706,7 +707,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             }
         )
 
-        val amount = amountEditText.text.toString().toDoubleOrNull() ?: 0.0
+        val amount = parseAmount(amountEditText.text.toString()) ?: 0.0
         val result = SplitCalculator.resolve(
             totalAmount = amount,
             participants = people,
@@ -746,7 +747,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         if (date > 0L) selectedTimestamp = date
         val account = intent.getStringExtra(EXTRA_TRANSACTION_ACCOUNT).orEmpty()
 
-        if (receivedAmount > 0.0) amountEditText.setText(receivedAmount.toString())
+        if (receivedAmount > 0.0) amountEditText.setText(formatAmount(receivedAmount))
         if (!receivedMerchant.isNullOrEmpty()) merchantEditText.setText(receivedMerchant)
         if (account.isNotBlank()) selectedAccount = account
         updateDateButtonText()
@@ -773,7 +774,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 db.transactionDao().getTransactionById(transactionId)
             }
             transactionToEdit?.let { tx ->
-                amountEditText.setText(tx.amount.toString())
+                amountEditText.setText(formatAmount(tx.amount))
                 merchantEditText.setText(tx.merchantName)
                 selectedAccount = tx.account
                 selectedType = MoneyManagerExporter.normalizeType(tx.transactionType)
@@ -783,6 +784,8 @@ class TransactionEntryActivity : AppCompatActivity() {
                 selectedTimestamp = tx.timestamp
                 selectedSplitMode = SplitMode.normalize(tx.splitMode)
                 currentReviewStatus = tx.reviewStatus
+                // Exported rows can only be saved as exported; a "draft" would re-export them.
+                saveDraftButton.isVisible = tx.reviewStatus != ReviewStatus.EXPORTED
                 selectedSplitwiseGroupId = tx.splitwiseGroupId.takeIf { it > 0L }
                     ?: splitwiseStore.load().defaultGroupId
                 selectedSplitwiseExpenseId = tx.splitwiseExpenseId
@@ -951,6 +954,16 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
     }
 
+    private var saving = false
+
+    /** Accepts "1,250.00" as pasted from an SMS. */
+    private fun parseAmount(raw: String): Double? =
+        raw.replace(",", "").trim().toBigDecimalOrNull()?.toDouble()
+
+    /** Plain digits: Double.toString() shows ₹1 crore as "1.0E7". */
+    private fun formatAmount(amount: Double): String =
+        BigDecimal.valueOf(amount).stripTrailingZeros().toPlainString()
+
     private fun saveOrUpdateTransaction(markReviewed: Boolean) {
         val amountStr = amountEditText.text.toString()
         var merchant = merchantEditText.text.toString().trim()
@@ -961,7 +974,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         if (amountStr.isEmpty()) {
             amountEditText.error = "Required"; return
         }
-        val amount = amountStr.toDoubleOrNull()
+        val amount = parseAmount(amountStr)
         if (amount == null || amount <= 0) {
             amountEditText.error = "Invalid amount"; return
         }
@@ -1012,12 +1025,7 @@ class TransactionEntryActivity : AppCompatActivity() {
             }
         }
 
-        val previous = transactionToEdit?.reviewStatus
-        val status = when {
-            markReviewed && previous == ReviewStatus.EXPORTED -> ReviewStatus.EXPORTED
-            markReviewed -> ReviewStatus.REVIEWED
-            else -> ReviewStatus.NEEDS_REVIEW
-        }
+        val status = ReviewStatus.afterSave(transactionToEdit?.reviewStatus, markReviewed)
         val idMap = if (transfer || participants.isEmpty()) {
             emptyMap()
         } else {
@@ -1053,6 +1061,11 @@ class TransactionEntryActivity : AppCompatActivity() {
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
 
+        // A double tap would otherwise insert the same new transaction twice.
+        if (saving) return
+        saving = true
+        saveButton.isEnabled = false
+        saveDraftButton.isEnabled = false
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) {
@@ -1074,16 +1087,19 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
                 Toast.makeText(
                     this@TransactionEntryActivity,
-                    if (markReviewed) {
-                        if (status == ReviewStatus.EXPORTED) "Saved (exported)" else "Marked reviewed"
-                    } else {
-                        "Saved draft"
+                    when {
+                        status == ReviewStatus.EXPORTED -> "Saved (exported)"
+                        markReviewed -> "Marked reviewed"
+                        else -> "Saved draft"
                     },
                     Toast.LENGTH_SHORT
                 ).show()
                 finish()
             } catch (e: Exception) {
                 Log.e("TransactionEntry", "Save failed", e)
+                saving = false
+                saveButton.isEnabled = true
+                saveDraftButton.isEnabled = true
                 Toast.makeText(this@TransactionEntryActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
@@ -1150,6 +1166,14 @@ class TransactionEntryActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun hasUnsavedSplitChanges(saved: Transaction): Boolean {
+        val uiAmount = parseAmount(amountEditText.text.toString())
+        return selectedSplitwiseGroupId != saved.splitwiseGroupId ||
+            selectedParticipants().joinToString(",") != saved.participants ||
+            SplitMode.normalize(selectedSplitMode) != SplitMode.normalize(saved.splitMode) ||
+            uiAmount == null || kotlin.math.abs(uiAmount - saved.amount) >= 0.005
+    }
+
     private fun pushCurrentToSplitwise() {
         if (currentTransactionId == INVALID_TRANSACTION_ID) {
             Toast.makeText(this, "Save the transaction first", Toast.LENGTH_SHORT).show()
@@ -1166,40 +1190,22 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
         buttonPushSplitwise.isEnabled = false
         lifecycleScope.launch {
+            val dao = db.transactionDao()
+            val saved = withContext(Dispatchers.IO) { dao.getTransactionById(currentTransactionId) }
+            // Push exactly what is saved: mixing the saved amount with unsaved people/group
+            // sent Splitwise a split nobody chose.
+            val unsaved = saved != null && hasUnsavedSplitChanges(saved)
             val result = withContext(Dispatchers.IO) {
-                val dao = db.transactionDao()
-                val latest = dao.getTransactionById(currentTransactionId)
-                    ?: return@withContext null to "Transaction missing"
+                val latest = saved ?: return@withContext null to "Transaction missing"
                 if (!ReviewStatus.canPushToSplitwise(latest.reviewStatus)) {
                     return@withContext null to getString(R.string.splitwise_push_needs_reviewed)
                 }
-                val withGroup = latest.copy(
-                    splitwiseGroupId = selectedSplitwiseGroupId,
-                    splitwiseParticipantIds = Transaction.encodeParticipantIds(selectedParticipantIdMap())
-                        .ifBlank { latest.splitwiseParticipantIds },
-                    participants = selectedParticipants().joinToString(",")
-                        .ifBlank { latest.participants }
+                if (unsaved) {
+                    return@withContext null to getString(R.string.splitwise_save_before_push)
+                }
+                val push = SplitwisePusher.pushAndRecord(
+                    dao, SplitwiseApi.from(splitwiseStore), auth, latest
                 )
-                if (withGroup != latest) {
-                    dao.updateTransaction(withGroup)
-                }
-                val push = SplitwisePusher.pushOne(SplitwiseApi.from(splitwiseStore), auth, withGroup)
-                if (push.isSuccess && push.expenseId != null) {
-                    dao.updateTransaction(
-                        withGroup.copy(
-                            splitwiseExpenseId = push.expenseId,
-                            splitwisePushError = "",
-                            lastUpdatedTimestamp = System.currentTimeMillis()
-                        )
-                    )
-                } else if (!push.isSuccess) {
-                    dao.updateTransaction(
-                        withGroup.copy(
-                            splitwisePushError = (push.error ?: "Push failed").take(240),
-                            lastUpdatedTimestamp = System.currentTimeMillis()
-                        )
-                    )
-                }
                 push to null
             }
             val (push, missing) = result

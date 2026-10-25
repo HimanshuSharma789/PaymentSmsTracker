@@ -9,6 +9,9 @@
     <string name="agent_chat_apply">Apply</string>
     <string name="agent_chat_skip">Skip</string>
     <string name="agent_chat_undo">Undo</string>
+    <string name="agent_chat_apply_all_confirm">Apply every pending card? Each can be undone from its card.</string>
+    <string name="agent_chat_apply_all_free_text">%1$d of these rewrite merchant or notes text written by the AI. Read those cards first. Apply all?</string>
+    <string name="agent_chat_free_text_warning">Rewrites merchant/notes text written by the AI. Check it.</string>
     <string name="agent_chat_apply_all">Apply all (%d)</string>
     <string name="agent_chat_applied">Applied</string>
     <string name="agent_chat_skipped">Skipped</string>

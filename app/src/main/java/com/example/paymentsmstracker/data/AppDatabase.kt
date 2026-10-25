@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [Transaction::class, MerchantPreference::class],
     version = 9,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -71,7 +71,9 @@ abstract class AppDatabase : RoomDatabase() {
                     "transaction_database"
                 )
                     .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
-                    .fallbackToDestructiveMigration()
+                    // Only pre-v5 dev builds (no migrations ever written) may be wiped.
+                    // A missing migration from 5+ must fail loudly, never drop the ledger.
+                    .fallbackToDestructiveMigrationFrom(true, 1, 2, 3, 4)
                     .build()
                 INSTANCE = instance
                 instance

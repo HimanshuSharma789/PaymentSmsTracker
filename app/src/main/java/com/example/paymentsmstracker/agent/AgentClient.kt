@@ -1,5 +1,6 @@
 package com.example.paymentsmstracker.agent
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,7 +26,7 @@ class AgentClient(
     private val apiKey: String,
     private val baseUrl: String = provider.defaultBaseUrl,
     private val model: String = provider.defaultModel,
-    private val http: OkHttpClient = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).build()
+    private val http: OkHttpClient = SHARED_HTTP
 ) {
 
     fun chat(
@@ -36,23 +37,41 @@ class AgentClient(
     ): Result<ChatMessage.Assistant> = runCatching {
         val claude = provider == AgentProvider.CLAUDE
         val body = if (claude) claudeBody(system, messages, tools, forceTool) else openAiBody(system, messages, tools, forceTool)
+        AgentSettings.endpointProblem(baseUrl)?.let { error(it) }
         val builder = Request.Builder()
             .url(if (claude) "$baseUrl/v1/messages" else "$baseUrl/chat/completions")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
+        // endpointProblem only lets http through to local/LAN hosts; even there, a key only goes
+        // over https or to this phone itself (loopback), never in clear across Wi-Fi.
+        val secure = baseUrl.toHttpUrlOrNull()?.let { it.isHttps || it.host == "localhost" || it.host.startsWith("127.") } == true
         if (claude) {
-            builder.header("x-api-key", apiKey).header("anthropic-version", "2023-06-01")
-        } else if (apiKey.isNotBlank()) {
+            builder.header("anthropic-version", "2023-06-01")
+            if (secure) builder.header("x-api-key", apiKey)
+        } else if (apiKey.isNotBlank() && secure) {
             builder.header("Authorization", "Bearer $apiKey")
         }
-        http.newCall(builder.build()).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
+        val request = builder.build()
+        var attempt = 0
+        while (true) {
+            http.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    return@runCatching if (claude) claudeReply(JSONObject(text)) else openAiReply(JSONObject(text), forceTool)
+                }
+                // 429 (rate limit, common on OpenRouter) and overload/5xx are worth a short wait.
+                if (response.code in RETRYABLE && attempt < MAX_RETRIES) {
+                    val waitSec = response.header("retry-after")?.toLongOrNull() ?: (2L shl attempt)
+                    Thread.sleep(waitSec.coerceIn(1, MAX_RETRY_WAIT_SEC) * 1000)
+                    attempt++
+                    return@use
+                }
                 val message = runCatching { JSONObject(text).getJSONObject("error").getString("message") }
                     .getOrDefault(text.take(200))
                 error("AI request failed (${response.code}): $message")
             }
-            if (claude) claudeReply(JSONObject(text)) else openAiReply(JSONObject(text), forceTool)
         }
+        @Suppress("UNREACHABLE_CODE")
+        error("unreachable")
     }
 
     private fun claudeBody(system: String, messages: List<ChatMessage>, tools: List<ToolSpec>, forceTool: String?): JSONObject {
@@ -70,7 +89,8 @@ class AgentClient(
             pendingResults = null
             when (m) {
                 is ChatMessage.User -> out.put(JSONObject().put("role", "user").put("content", m.text))
-                is ChatMessage.Assistant -> {
+                // Anthropic rejects an assistant turn with empty content.
+                is ChatMessage.Assistant -> if (m.text.isNotBlank() || m.toolCalls.isNotEmpty()) {
                     val content = JSONArray()
                     if (m.text.isNotBlank()) content.put(JSONObject().put("type", "text").put("text", m.text))
                     m.toolCalls.forEach {
@@ -156,6 +176,15 @@ class AgentClient(
     }
 
     companion object {
+        private const val MAX_RETRIES = 2
+        private const val MAX_RETRY_WAIT_SEC = 20L
+        private val RETRYABLE = setOf(429, 500, 502, 503, 529)
+
+        /** One client (connection pool + threads) for the whole app, not one per message. */
+        private val SHARED_HTTP: OkHttpClient by lazy {
+            OkHttpClient.Builder().callTimeout(90, TimeUnit.SECONDS).build()
+        }
+
         /** Properties of the `propose` tool input; the chat agent reuses them. Fresh copy per access. */
         val PROPOSE_FIELDS_SCHEMA: JSONObject get() {
             fun str() = JSONObject().put("type", "string")

@@ -2,11 +2,12 @@ package com.example.paymentsmstracker.agent
 
 import android.content.Context
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Wire format is Anthropic Messages for [CLAUDE], OpenAI chat completions for the rest. */
 enum class AgentProvider(val defaultBaseUrl: String, val defaultModel: String) {
     CLAUDE("https://api.anthropic.com", "claude-haiku-4-5-20251001"),
-    // Free tier, supports tools + tool_choice (temp-agent-plan/openrouter-llm.txt). Free models rate-limit (429) often.
+    // Cheap paid model (~$0.24 / $2.20 per M tokens), supports tools + tool_choice. Free ":free" models 429 often.
     OPENROUTER("https://openrouter.ai/api/v1", "qwen/qwen3.8-27b"),
     OPENAI_COMPATIBLE("https://api.openai.com/v1", "gpt-4.1-mini");
 
@@ -74,4 +75,20 @@ class AgentSettings(context: Context) {
     val isReady: Boolean get() = enabled && (!provider.keyRequired || apiKey(provider).isNotBlank())
 
     fun client(): AgentClient = provider.let { AgentClient(it, apiKey(it), baseUrl(it), model(it)) }
+
+    companion object {
+        /**
+         * Null when [baseUrl] may be used. https anywhere; plain http only to this device or the
+         * local network (Ollama / LM Studio), so transaction data never crosses the internet in clear.
+         */
+        fun endpointProblem(baseUrl: String): String? {
+            val url = baseUrl.trim().toHttpUrlOrNull() ?: return "Invalid URL"
+            if (url.isHttps) return null
+            val host = url.host
+            val local = host == "localhost" || host.endsWith(".local") || host == "10.0.2.2" ||
+                host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.") ||
+                Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(host)
+            return if (local) null else "Use https, or http only for a server on this phone or your local network"
+        }
+    }
 }

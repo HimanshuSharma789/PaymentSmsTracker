@@ -1,5 +1,6 @@
 package com.example.paymentsmstracker
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -89,7 +90,13 @@ class MainActivity : AppCompatActivity() {
         val missing = PermissionsPanel.corePermissions().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (missing.isNotEmpty()) startupPermissionsLauncher.launch(missing.toTypedArray())
+        if (missing.isEmpty()) return
+        val ask = { startupPermissionsLauncher.launch(missing.toTypedArray()) }
+        if (missing.contains(Manifest.permission.READ_SMS) || missing.contains(Manifest.permission.RECEIVE_SMS)) {
+            Disclosures.sms(this) { ask() }
+        } else {
+            ask()
+        }
     }
 
     private fun observeHomeCounts() {

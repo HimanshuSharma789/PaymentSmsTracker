@@ -8,6 +8,7 @@ Read this first. Then open the page that matches the question.
 | What a human does day to day | [USER_FLOW.md](USER_FLOW.md) |
 | How SMS becomes Money Manager / Splitwise rows | [DATA_FLOW.md](DATA_FLOW.md) |
 | Modules, storage, screens, APIs | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Releasing to Google Play (checklist, declarations, disclosure copy) | [PLAY_STORE.md](PLAY_STORE.md), [../PRIVACY_POLICY.md](../PRIVACY_POLICY.md) |
 
 This Android app lives in `PaymentSmsTracker/`. The parent repo (`expense-manager/`) also has a Python CSV/XLSX converter for historical spreadsheets. That converter is a sibling, not part of this app.
 

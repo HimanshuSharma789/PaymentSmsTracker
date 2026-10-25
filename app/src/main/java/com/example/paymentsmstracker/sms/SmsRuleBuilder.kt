@@ -34,6 +34,8 @@ object SmsRuleBuilder {
         "accountHint" to """(?<accountHint>.+?)"""
     )
 
+    private const val MAX_TAIL_ANCHOR = 24
+
     private val REGEX_META = setOf(
         '.', '^', '$', '*', '+', '?', '(', ')', '[', ']', '{', '}', '\\', '|'
     )
@@ -118,23 +120,28 @@ object SmsRuleBuilder {
             }
         }
 
+        // Text after the last capture (balance, helpline, card digits) changes per SMS. Keep only
+        // a short digit-free prefix of it as an anchor so the next SMS of this template matches.
+        val tailAnchor = sms.substring(sorted.last().end)
+            .takeWhile { !it.isDigit() }
+            .take(MAX_TAIL_ANCHOR)
+
         val sb = StringBuilder("(?i)")
         var pos = 0
         for ((index, span) in sorted.withIndex()) {
             sb.append(escapeLiteral(sms.substring(pos, span.start)))
-            val isLastMerchantAtEnd =
-                span.group == "merchant" &&
-                    index == sorted.lastIndex &&
-                    span.end == sms.length
-            val groupPat = if (isLastMerchantAtEnd) {
-                """(?<merchant>.+)"""
-            } else {
-                GROUP_PATTERNS.getValue(span.group)
+            val isLast = index == sorted.lastIndex
+            val groupPat = when {
+                // Lazy merchant with nothing after it would capture one character.
+                span.group == "merchant" && isLast && span.end == sms.length -> """(?<merchant>.+)"""
+                span.group == "merchant" && isLast && tailAnchor.isBlank() ->
+                    """(?<merchant>.+?)(?=\s*\d|$)"""
+                else -> GROUP_PATTERNS.getValue(span.group)
             }
             sb.append(groupPat)
             pos = span.end
         }
-        sb.append(escapeLiteral(sms.substring(pos)))
+        sb.append(escapeLiteral(tailAnchor))
 
         val pattern = sb.toString()
         return try {
@@ -184,7 +191,10 @@ object SmsRuleBuilder {
     private fun overlaps(a: CaptureSpan, b: CaptureSpan): Boolean =
         a.start < b.end && b.start < a.end
 
-    /** Escape regex metacharacters; collapse whitespace runs to \\s+. */
+    /**
+     * Escape regex metacharacters; collapse whitespace runs to \\s+; turn digit runs (card
+     * last-4, times, balances) into a number pattern, since they differ between SMS.
+     */
     fun escapeLiteral(raw: String): String {
         if (raw.isEmpty()) return ""
         val sb = StringBuilder()
@@ -192,6 +202,12 @@ object SmsRuleBuilder {
         while (i < raw.length) {
             val ch = raw[i]
             when {
+                ch.isDigit() -> {
+                    sb.append("""[\d,.]*\d""")
+                    while (i + 1 < raw.length && (raw[i + 1].isDigit() ||
+                            (raw[i + 1] in ",." && i + 2 < raw.length && raw[i + 2].isDigit()))
+                    ) i++
+                }
                 ch.isWhitespace() -> {
                     sb.append("\\s+")
                     while (i + 1 < raw.length && raw[i + 1].isWhitespace()) i++

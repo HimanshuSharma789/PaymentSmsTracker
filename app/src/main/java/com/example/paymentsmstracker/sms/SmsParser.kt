@@ -49,11 +49,31 @@ class SmsParser(private val config: AppConfig) {
         requirePaymentHeuristic: Boolean = true
     ): ParsedSms? {
         if (requirePaymentHeuristic && !looksLikePayment(message)) return null
+        val kind = classify(message)
+        if (kind == MessageKind.NOT_A_TRANSACTION) return null
 
         for (rule in config.smsParseRules.filter { it.enabled }) {
-            parseWithRule(message, rule, receivedAtMs)?.let { return it }
+            val parsed = parseWithRule(message, rule, receivedAtMs) ?: continue
+            // A credit/refund must never become a spend; only an Income rule may claim it.
+            if (kind == MessageKind.CREDIT && parsed.transactionType != "Income") continue
+            return parsed
         }
-        return fallbackParse(message, receivedAtMs)
+        // The fallback only knows how to read spends.
+        return if (kind == MessageKind.CREDIT) null else fallbackParse(message, receivedAtMs)
+    }
+
+    enum class MessageKind { SPEND, CREDIT, NOT_A_TRANSACTION }
+
+    /**
+     * OTPs and reminders are not transactions. Money-in wording ("credited", "refund") with no
+     * money-out wording is a credit; "debited … credited to NAME" (UPI P2P) stays a spend.
+     */
+    fun classify(message: String): MessageKind {
+        val lower = message.lowercase(Locale.ENGLISH)
+        if (NOT_A_TRANSACTION_WORDS.any { lower.contains(it) }) return MessageKind.NOT_A_TRANSACTION
+        val moneyIn = CREDIT_WORDS.any { lower.contains(it) }
+        val moneyOut = DEBIT_WORDS.any { Regex("\\b$it\\b").containsMatchIn(lower) }
+        return if (moneyIn && !moneyOut) MessageKind.CREDIT else MessageKind.SPEND
     }
 
     /** Try a single rule (used by the SMS rule wizard verify step). */
@@ -177,7 +197,7 @@ class SmsParser(private val config: AppConfig) {
         }
 
         // 2) Rule-captured date/time (date-only common for bank SMS).
-        parseDate(dateRaw, primaryFormat)?.let { parsed ->
+        parseDate(dateRaw, primaryFormat, anchorMs = receivedAtMs ?: System.currentTimeMillis())?.let { parsed ->
             if (dateRawHasTime(dateRaw)) {
                 return ResolvedTimestamp(parsed, fromMessage = true)
             }
@@ -248,10 +268,12 @@ class SmsParser(private val config: AppConfig) {
 
     private fun extractFallbackReference(message: String): String? {
         val pattern = Pattern.compile(
-            """(?i)(?:Ref(?:no|erence)?|UPI\s+Ref\s+No)\s*[:\s]*([A-Za-z0-9.-]+)"""
+            // Whole word "Ref"/"Reference", optional "No."/"Number", then a token with a digit,
+            // so "Ref No: 4123…" gives the number (not "No") and "Refund" matches nothing.
+            """(?i)\bRef(?:erence)?(?:\.?\s*No\.?|\s*Number)?\s*[:#.]?\s*(?=[A-Za-z0-9-]*\d)([A-Za-z0-9-]{6,})"""
         )
         val matcher = pattern.matcher(message)
-        return if (matcher.find()) matcher.group(1)?.trim()?.trimEnd('.', ',', ';') else null
+        return if (matcher.find()) matcher.group(1) else null
     }
 
     private fun namedGroup(matcher: java.util.regex.Matcher, name: String): String? {
@@ -264,7 +286,13 @@ class SmsParser(private val config: AppConfig) {
         }
     }
 
-    private fun parseDate(raw: String?, primaryFormat: String): Long? {
+    /** [anchorMs] supplies the year for year-less formats: the SMS time, not "now", so an
+     *  old SMS read by backfill keeps its own year. */
+    private fun parseDate(
+        raw: String?,
+        primaryFormat: String,
+        anchorMs: Long = System.currentTimeMillis()
+    ): Long? {
         if (raw.isNullOrBlank()) return null
         val normalized = raw.trim().replace('T', ' ')
         val formats = buildList {
@@ -296,14 +324,14 @@ class SmsParser(private val config: AppConfig) {
                 val sdf = SimpleDateFormat(format, Locale.ENGLISH)
                 sdf.isLenient = false
                 val parsed = sdf.parse(normalized) ?: continue
-                // Formats without year default to 1970 — pin to current year.
+                // Formats without year default to 1970 — pin to the anchor's year.
                 if (!format.contains("y", ignoreCase = true)) {
                     val cal = Calendar.getInstance().apply {
                         time = parsed
-                        set(Calendar.YEAR, Calendar.getInstance().get(Calendar.YEAR))
+                        set(Calendar.YEAR, Calendar.getInstance().apply { timeInMillis = anchorMs }.get(Calendar.YEAR))
                     }
-                    // If that lands in the future by > few days (e.g. Dec SMS in Jan), use previous year.
-                    if (cal.timeInMillis > System.currentTimeMillis() + 2L * 24 * 60 * 60 * 1000) {
+                    // If that lands after the anchor by > few days (e.g. Dec SMS read in Jan), use previous year.
+                    if (cal.timeInMillis > anchorMs + 2L * 24 * 60 * 60 * 1000) {
                         cal.add(Calendar.YEAR, -1)
                     }
                     return cal.timeInMillis
@@ -319,9 +347,19 @@ class SmsParser(private val config: AppConfig) {
     private fun cleanMerchant(raw: String): String {
         return raw
             .replace(Regex("""\s+Ac\s+x?\w+""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\s+Ref(?:no)?\s*[\w.-]+""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\s+Ref\b(?:\.?\s*No\.?)?\s*[:#]?\s*[\w.-]+""", RegexOption.IGNORE_CASE), "")
             .trim()
             .trimEnd('.', ',', '-')
             .replace(Regex("""\s+"""), " ")
+    }
+
+    private companion object {
+        val NOT_A_TRANSACTION_WORDS = listOf(
+            "otp", "one time password", "verification code", "is due", "due on", "due by",
+            "will be debited", "will be charged", "requested money", "collect request", "payment reminder"
+        )
+        val CREDIT_WORDS = listOf("credited to your", "credited in your", "has been credited", "is credited",
+            "refund", "reversed", "reversal", "received rs", "received inr", "cashback")
+        val DEBIT_WORDS = listOf("debited", "spent", "sent", "paid", "withdrawn", "purchase")
     }
 }

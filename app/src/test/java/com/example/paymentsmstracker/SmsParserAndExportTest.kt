@@ -9,6 +9,7 @@ import com.example.paymentsmstracker.sms.SmsParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
@@ -394,5 +395,84 @@ class SmsParserAndExportTest {
         assertEquals(2, rows.size)
         assertEquals("22.50", rows[0].amount)
         assertEquals("67.50", rows[1].amount)
+    }
+
+    @Test
+    fun creditsOtpsAndRemindersAreNotSpends() {
+        assertNull(parser.parse("Refund of Rs 500 credited to your HDFC Bank Credit Card XX12 on 15-Oct-26"))
+        assertNull(parser.parse("OTP for transaction of INR 4,999.00 at AMAZON is 123456. Do not share."))
+        assertNull(parser.parse("Your credit card payment of Rs 12,000 is due on 20-Oct-26"))
+        // UPI P2P debit that mentions the payee being credited is still a spend.
+        assertNotNull(parser.parse("ICICI Bank Acct XX12 debited for Rs 100.00 on 15-Oct-26; RAVI credited. UPI:412345678901"))
+    }
+
+    @Test
+    fun genericRuleCapturesReference() {
+        val parsed = parser.parse("Rs 250 paid to CHAI POINT on 15-Oct-26. UPI Ref no 412345678901")
+        assertEquals("generic_paid_to_on", parsed?.matchedRuleId)
+        assertEquals("412345678901", parsed?.referenceNumber)
+    }
+
+    @Test
+    fun yearlessDateTakesTheSmsYearNotToday() {
+        val dec2024 = Calendar.getInstance().apply { set(2024, Calendar.DECEMBER, 31, 12, 0) }.timeInMillis
+        val parsed = parser.parse(
+            "Thank you for using HSBC Debit Card XX12 for INR 100.00 on 30DEC at CAFE.",
+            receivedAtMs = dec2024
+        )
+        val cal = Calendar.getInstance().apply { timeInMillis = parsed!!.timestamp }
+        assertEquals(2024, cal.get(Calendar.YEAR))
+    }
+
+    @Test
+    fun dedupeKeepsReversalsAndUnknownRepeats() {
+        val debit = Transaction(
+            id = 1, amount = 20.0, merchantName = "Unknown", timestamp = 1_000L,
+            referenceNumber = "412345678901", transactionType = "Expense"
+        )
+        val reversal = parser.parse("Rs 20 debited. Ref no 412345678901", requirePaymentHeuristic = false)!!
+            .copy(transactionType = "Income", isExpense = false)
+        assertFalse(SmsDedupe.isDuplicateAgainst(listOf(debit), "reversal sms", reversal, 30))
+        val repeat = parser.parse("Rs 20 debited at counter", requirePaymentHeuristic = false)!!
+            .copy(timestamp = 2_000L)
+        assertEquals("Unknown", repeat.merchantName)
+        assertFalse(SmsDedupe.isDuplicateAgainst(listOf(debit.copy(referenceNumber = null)), "other sms", repeat, 30))
+    }
+
+    @Test
+    fun tsvEscapesEveryColumnAndSortsAcrossYears() {
+        val jan2026 = Calendar.getInstance().apply { set(2026, Calendar.JANUARY, 2, 10, 0) }.timeInMillis
+        val dec2025 = Calendar.getInstance().apply { set(2025, Calendar.DECEMBER, 30, 10, 0) }.timeInMillis
+        val txs = listOf(
+            Transaction(id = 1, amount = 10.0, merchantName = "New", timestamp = jan2026,
+                account = "My\tBank", category = "Food\nX", reviewStatus = "reviewed"),
+            Transaction(id = 2, amount = 20.0, merchantName = "Old", timestamp = dec2025,
+                account = "Cash", category = "Food", reviewStatus = "reviewed")
+        )
+        val lines = MoneyManagerExporter.toTsv(txs, AppConfig()).trimEnd().lines()
+        assertEquals(3, lines.size)
+        assertTrue(lines[1].startsWith("12/30/2025"))
+        assertEquals(8, lines[2].split("\t").size)
+    }
+
+    @Test
+    fun invalidSplitIsBlockedFromMoneyManager() {
+        val broken = Transaction(
+            amount = 300.0, merchantName = "Dinner", timestamp = 1L, participants = "ME,A",
+            splitMode = "exact", splitAllocations = "ME:100,A:100", reviewStatus = "reviewed"
+        )
+        assertNotNull(MoneyManagerExporter.exportBlocker(broken, AppConfig()))
+        assertNull(MoneyManagerExporter.exportBlocker(broken.copy(splitAllocations = "ME:100,A:200"), AppConfig()))
+        assertNull(MoneyManagerExporter.exportBlocker(broken, AppConfig(mmFullSplitAsOwnExpense = true)))
+    }
+
+    @Test
+    fun fallbackReferenceIsTheNumberNotAWord() {
+        val fallbackOnly = SmsParser(AppConfig(smsParseRules = emptyList()))
+        fun ref(sms: String) = fallbackOnly.parse(sms, requirePaymentHeuristic = false)?.referenceNumber
+        assertEquals("412345678901", ref("Rs 50 paid to Chai. UPI Ref No: 412345678901"))
+        assertEquals("998877", ref("Rs 50 debited. Ref no. 998877"))
+        assertEquals("ABC123456", ref("Rs 50 debited. Ref.No.ABC123456 thanks"))
+        assertEquals(null, ref("Refund of Rs 300 at Refreshments Corner"))
     }
 }

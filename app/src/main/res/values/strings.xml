@@ -45,6 +45,7 @@
     <string name="split_use_equal">Use equal split</string>
     <string name="split_pick_group_first">Choose a Splitwise group, then pick who shares this expense.</string>
     <string name="split_sync_groups_hint">Sync Splitwise groups in Admin first.</string>
+    <string name="splitwise_save_before_push">Save your changes first; Push sends the saved transaction</string>
     <string name="splitwise_push_needs_reviewed">Mark as reviewed before pushing to Splitwise</string>
     <string name="split_equal">Equal</string>
     <string name="split_exact">Uneven</string>
@@ -53,7 +54,7 @@
     <string name="split_value_hint">Value</string>
     <string name="split_allocations_title">Allocations</string>
     <string name="split_hint_exact">Enter exact ₹ amount for each person. Total must match the expense.</string>
-    <string name="split_hint_percent">Enter % for each person. Total must be 100.</string>
+    <string name="split_hint_percent" formatted="false">Enter % for each person. Total must be 100.</string>
     <string name="split_hint_weight">Enter share weights (e.g. 1, 2, 1). Larger weight = larger share.</string>
     <string name="split_hint_equal">Equal share for everyone selected.</string>
     <string name="admin">Admin</string>
@@ -208,7 +209,7 @@
     <string name="clear_mm_exported">Clear MM exported</string>
     <string name="clear_mm_exported_older">Delete MM exported older than 30 days</string>
     <string name="clear_mm_exported_older_title">Delete old MM exports?</string>
-    <string name="clear_mm_exported_older_message">Delete %1$d MM-exported transaction(s) last updated more than 30 days ago? This cannot be undone. Shared expenses already on Splitwise are included if they match.</string>
+    <string name="clear_mm_exported_older_message">Delete %1$d MM-exported transaction(s) last updated more than 30 days ago? This cannot be undone. Shared expenses already on Splitwise are included; splits still waiting to be pushed are kept.</string>
     <string name="clear_mm_exported_older_none">No MM-exported transactions older than 30 days</string>
     <string name="clear_mm_exported_older_done">Deleted %1$d old MM-exported transaction(s)</string>
     <string name="export_all_raw">Export All (Raw CSV)</string>
@@ -313,13 +314,13 @@
     <string name="perm_notifications_title">Notifications</string>
     <string name="perm_notifications_reason">Alert you when a new transaction is detected, plus the nightly review reminder.</string>
     <string name="perm_location_title">Location</string>
-    <string name="perm_location_reason">Save where you were when a payment SMS arrived. Choose \"Allow all the time\" so it works while the app is closed.</string>
+    <string name="perm_location_reason">Payment SMS Tracker collects location data to tag a transaction with where you were when its payment SMS arrived, only while you are using the app. Location is not collected when the app is closed or not in use.
+
+Location is stored only on this phone and is never sent anywhere unless you turn on \"Location\" under AI Assist → What the AI can read.</string>
     <string name="perm_status_granted">Status: Allowed</string>
     <string name="perm_status_denied">Status: Not allowed</string>
     <string name="perm_status_location_foreground">Status: Only while using the app</string>
-    <string name="perm_status_location_always">Status: Allowed all the time</string>
     <string name="perm_action_allow">Allow</string>
-    <string name="perm_action_allow_always">Allow all the time</string>
     <string name="perm_action_manage">Manage in Android settings</string>
     <string name="perm_open_settings_hint">Permission is blocked. Change it in Android settings.</string>
 
@@ -362,4 +363,20 @@
     <string name="ai_read_location">Location</string>
     <string name="ai_read_location_hint">Latitude and longitude of the payment.</string>
     <string name="ai_disclosure">Only the items switched on above are sent to the chosen provider (OpenRouter forwards them to the model\'s vendor), and only when you use AI Assist. Reference numbers, Splitwise tokens and API keys are never sent.</string>
+    <!-- Play: disclosures -->
+    <string name="disclosure_sms_title">Read your bank payment SMS</string>
+    <string name="disclosure_sms_body">Payment SMS Tracker reads the SMS that banks and UPI apps send when money leaves or enters your account. It uses them to fill in the amount, merchant, date and account of each transaction for you to review.\n\n• Only messages from senders that look like banks are read; personal messages are skipped and never stored.\n• Transactions are saved only on this phone. They are not uploaded to us, and we don\'t run any server.\n• They leave the phone only if you choose to: pushing a split to Splitwise, or turning on AI Assist with your own API key.\n\nYou can turn this off any time in Android Settings → Apps → Payment SMS Tracker → Permissions.</string>
+    <string name="disclosure_location_title">Save where you paid</string>
+    <string name="disclosure_continue">Continue</string>
+    <string name="disclosure_not_now">Not now</string>
+    <string name="disclosure_ai_title">Send data to your AI provider?</string>
+    <string name="ai_consent_body">Only the items you switch on under \"What the AI can read\" are sent to the chosen provider (OpenRouter forwards them to the model\'s vendor), and only when you use AI Assist. Reference numbers, Splitwise tokens and API keys are never sent.</string>
+    <string name="disclosure_turn_on">Turn on</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <!-- TODO: replace with the hosted PRIVACY_POLICY.md URL before release -->
+    <string name="privacy_policy_url" translatable="false">https://github.com/nerdgeek404/PaymentSmsTracker/blob/main/PRIVACY_POLICY.md</string>
+    <string name="report_response">Report response</string>
+    <string name="report_subject" translatable="false">AI Assist response report</string>
+    <!-- TODO: set the developer email that receives AI response reports; empty falls back to a share chooser -->
+    <string name="report_email" translatable="false"></string>
 </resources>

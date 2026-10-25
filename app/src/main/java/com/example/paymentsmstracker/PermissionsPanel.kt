@@ -42,16 +42,15 @@ class PermissionsPanel(private val activity: AppCompatActivity, root: View) {
         }
 
     init {
-        smsButton.setOnClickListener { requestOrManage(SMS_PERMISSIONS) }
+        smsButton.setOnClickListener {
+            if (allGranted(SMS_PERMISSIONS)) openAppSettings()
+            else Disclosures.sms(activity) { launcher.launch(SMS_PERMISSIONS) }
+        }
         notificationsButton.setOnClickListener { requestOrManage(notificationPermissions()) }
+        // Foreground location only (no ACCESS_BACKGROUND_LOCATION in the manifest, Play policy).
         locationButton.setOnClickListener {
-            when {
-                !LocationCapture.hasForegroundPermission(activity) -> launcher.launch(FOREGROUND_LOCATION)
-                // On API 30+ Android shows its own settings screen for "Allow all the time".
-                !LocationCapture.hasBackgroundPermission(activity) ->
-                    launcher.launch(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
-                else -> openAppSettings()
-            }
+            if (LocationCapture.hasForegroundPermission(activity)) openAppSettings()
+            else Disclosures.location(activity) { launcher.launch(FOREGROUND_LOCATION) }
         }
     }
 
@@ -60,21 +59,10 @@ class PermissionsPanel(private val activity: AppCompatActivity, root: View) {
         bind(notificationsStatus, notificationsButton, allGranted(notificationPermissions()))
 
         val foreground = LocationCapture.hasForegroundPermission(activity)
-        val background = foreground && LocationCapture.hasBackgroundPermission(activity)
         locationStatus.setText(
-            when {
-                background -> R.string.perm_status_location_always
-                foreground -> R.string.perm_status_location_foreground
-                else -> R.string.perm_status_denied
-            }
+            if (foreground) R.string.perm_status_location_foreground else R.string.perm_status_denied
         )
-        locationButton.setText(
-            when {
-                background -> R.string.perm_action_manage
-                foreground -> R.string.perm_action_allow_always
-                else -> R.string.perm_action_allow
-            }
-        )
+        locationButton.setText(if (foreground) R.string.perm_action_manage else R.string.perm_action_allow)
     }
 
     private fun bind(status: TextView, button: MaterialButton, granted: Boolean) {

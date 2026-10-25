@@ -1,27 +1,49 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
 }
 
 android {
+    // Kotlin/R package only; Play never sees it. Leave as-is when choosing the store id.
     namespace = "com.example.paymentsmstracker"
-    compileSdk = 35
+    // Play: new apps and updates must target API 36 since 2025-08-31 (extension to 2026-11-01).
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.paymentsmstracker"
+        // Permanent once published to Play. namespace stays com.example.* because `in` is a Kotlin keyword.
+        // FileProvider authority follows via ${applicationId}.
+        applicationId = "in.nerdgeek404.paymentsmstracker"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
+        // Single source of the version. Bump versionCode by 1 for every upload to any Play track.
         versionCode = 3
         versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing from an untracked keystore.properties (storeFile, storePassword, keyAlias,
+    // keyPassword). Without it, assembleRelease produces an unsigned APK.
+    val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists() }
+        ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+    if (keystoreProps != null) {
+        signingConfigs.create("release") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            if (keystoreProps != null) signingConfig = signingConfigs.getByName("release")
+            // R8: smaller APK, and the -assumenosideeffects rule strips debug/info logs.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -35,21 +57,17 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    buildFeatures {
-        compose = true
-    }
+}
+
+ksp {
+    // Commit app/schemas/: each version's JSON is what a future migration test diffs against.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.material)
@@ -80,8 +98,4 @@ dependencies {
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 }

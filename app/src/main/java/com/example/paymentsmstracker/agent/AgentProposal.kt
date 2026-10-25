@@ -58,6 +58,10 @@ data class Suggestion(
 
     val hasChanges: Boolean get() = before != after
 
+    /** Merchant/notes text written by the model: the one place SMS-borne prompt injection can land. */
+    val changesFreeText: Boolean
+        get() = before.merchantName != after.merchantName || before.notes != after.notes
+
     private fun splitLabel(s: FormState): String {
         if (s.participants.isEmpty()) return ""
         val people = s.participants.joinToString(", ") { name ->

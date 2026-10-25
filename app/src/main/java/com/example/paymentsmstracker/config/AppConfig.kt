@@ -42,9 +42,29 @@ data class AppConfig(
      * Appearance: light | system | dynamic
      * dynamic = follow system day/night + Material You colors when available.
      */
-    val themeMode: String = ThemeMode.DYNAMIC
+    val themeMode: String = ThemeMode.DYNAMIC,
+    /**
+     * SMS senders containing any of these (case-insensitive) are read as bank SMS, live and in
+     * backfill. Empty = accept every sender. Indian bank IDs look like "VM-HDFCBK", "AD-SBIUPI".
+     */
+    val bankSenderTokens: List<String> = DEFAULT_BANK_SENDER_TOKENS
 ) {
+    /** Null/blank sender (Admin test SMS) is always accepted. */
+    fun isBankSender(address: String?): Boolean {
+        if (address.isNullOrBlank() || bankSenderTokens.isEmpty()) return true
+        val normalized = address.uppercase()
+        return bankSenderTokens.any { normalized.contains(it.uppercase()) }
+    }
+
     companion object {
+        val DEFAULT_BANK_SENDER_TOKENS = listOf(
+            "SBI", "HDFC", "HSBC", "ICICI", "AXIS", "KOTAK", "IDFC", "YESBNK", "YESBANK", "INDUS",
+            "PNB", "CANBK", "BOI", "UNION", "BOB", "BARODA", "FEDBNK", "FEDERAL", "IDBI", "CENTBK",
+            "IOB", "UCO", "RBL", "AUBANK", "BANDHN", "KVB", "KBL", "SIBSMS", "CITI", "SCBANK", "DBS",
+            "AMEX", "PAYTM", "AIRTEL", "AIRBNK", "PHONEPE", "GPAY", "GOOGLEPAY", "AMAZONPAY",
+            "MOBIKWIK", "FREECHARGE", "CRED", "SLICE", "ONECARD", "JUPITER", "NIYO", "BHIM"
+        )
+
         val DEFAULT_ACCOUNTS = listOf(
             "Cash",
             "SBI",
@@ -86,6 +106,13 @@ data class AppConfig(
             "Investment" to emptyList(),
             "Credit bill payment" to emptyList()
         )
+
+        /** v1 generic pattern: its trailing lazy `.*?` made the reference group always empty. */
+        const val GENERIC_PAID_TO_ON_PATTERN_V1 =
+            """(?i)(?:INR|Rs\.?|₹)\s*(?<amount>[\d,]+(?:\.\d{1,2})?).*?\bto\s+(?<merchant>.+?)\s+on\s+(?<date>\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}\s\w{3}\s\d{2,4}).*?(?:ref(?:erence)?\s*(?:no\.?)?\s*(?<reference>[\w.-]+))?"""
+
+        const val GENERIC_PAID_TO_ON_PATTERN =
+            """(?i)(?:INR|Rs\.?|₹)\s*(?<amount>[\d,]+(?:\.\d{1,2})?).*?\bto\s+(?<merchant>.+?)\s+on\s+(?<date>\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}\s\w{3}\s\d{2,4})(?:.*?\bref(?:erence)?\.?\s*(?:no\.?)?\s*[:#]?\s*(?<reference>\d[\w-]{5,}))?"""
 
         val DEFAULT_SMS_RULES = listOf(
             SmsParseRule(
@@ -147,7 +174,7 @@ data class AppConfig(
             SmsParseRule(
                 id = "generic_paid_to_on",
                 name = "Generic Paid To On",
-                pattern = """(?i)(?:INR|Rs\.?|₹)\s*(?<amount>[\d,]+(?:\.\d{1,2})?).*?\bto\s+(?<merchant>.+?)\s+on\s+(?<date>\d{1,2}[-/]\w{3}[-/]\d{2,4}|\d{1,2}\s\w{3}\s\d{2,4}).*?(?:ref(?:erence)?\s*(?:no\.?)?\s*(?<reference>[\w.-]+))?""",
+                pattern = GENERIC_PAID_TO_ON_PATTERN,
                 dateFormat = "dd-MMM-yy",
                 defaultAccount = ""
             )

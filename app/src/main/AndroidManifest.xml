@@ -9,10 +9,11 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Opt-in from Settings → Permissions: tags SMS transactions with where they arrived. -->
+    <!-- Opt-in from Settings → Permissions: tags SMS transactions with where they arrived.
+         Foreground-only on purpose: Play rejects ACCESS_BACKGROUND_LOCATION for convenience
+         features like this (see docs/PLAY_STORE.md), so a fix is taken only while the app is in use. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -30,6 +31,7 @@
 
     <application
         android:name=".MyApp"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -84,7 +86,10 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".TransactionEntryActivity" />
+        <!-- Handle rotation in place: a recreate dropped half-typed form state (no layout-land exists). -->
+        <activity
+            android:name=".TransactionEntryActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <activity android:name=".TransactionListActivity" />
         <activity android:name=".SplitsActivity" />
         <activity
@@ -93,6 +98,7 @@
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".AdminActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="false"
             android:launchMode="singleTop" />
         <activity

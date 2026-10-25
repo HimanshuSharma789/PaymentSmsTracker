@@ -22,7 +22,8 @@ data class MoneyManagerRow(
 
 object MoneyManagerExporter {
 
-    private val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH)
+    // SimpleDateFormat is not thread-safe; exports run on IO threads.
+    private val dateFormat = ThreadLocal.withInitial { SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH) }
 
     val HEADERS = listOf(
         "Date",
@@ -59,7 +60,14 @@ object MoneyManagerExporter {
     }
 
     fun formatDate(timestamp: Long): String =
-        dateFormat.format(Date(timestamp))
+        dateFormat.get()!!.format(Date(timestamp))
+
+    /** Why [transaction] must not go to MM yet, or null when it can be exported. */
+    fun exportBlocker(transaction: Transaction, config: AppConfig): String? {
+        if (normalizeType(transaction.transactionType) != "Expense" || config.mmFullSplitAsOwnExpense) return null
+        if (!SplitwiseExporter.isSplit(transaction)) return null
+        return SplitCalculator.resolve(transaction).error
+    }
 
     fun expandTransaction(transaction: Transaction, config: AppConfig): List<MoneyManagerRow> {
         val date = formatDate(transaction.timestamp)
@@ -126,13 +134,8 @@ object MoneyManagerExporter {
             )
         }
 
-        val split = SplitCalculator.resolve(transaction)
-        val personalShare = if (split.isValid) split.myShare else {
-            // Fall back to equal if stored allocations are invalid.
-            amount.divide(BigDecimal(participants.size), 2, RoundingMode.HALF_UP)
-                .takeIf { participants.any { it.equals("ME", true) } }
-                ?: BigDecimal.ZERO.setScale(2)
-        }
+        // MoneyManagerSync refuses invalid splits; the equal fallback is only a safety net.
+        val personalShare = SplitCalculator.resolveOrEqual(transaction).myShare
         val debtShare = amount.subtract(personalShare)
 
         val rows = mutableListOf<MoneyManagerRow>()
@@ -172,15 +175,9 @@ object MoneyManagerExporter {
     }
 
     fun toTsv(transactions: List<Transaction>, config: AppConfig): String {
-        val rows = transactions.flatMap { expandTransaction(it, config) }
-            .sortedWith(
-                compareBy(
-                    { it.date },
-                    { it.account },
-                    { it.description },
-                    { it.category }
-                )
-            )
+        // Sort by real time: the MM/dd/yyyy string would put 01/02/2026 before 12/30/2025.
+        val rows = transactions.sortedBy { it.timestamp }
+            .flatMap { expandTransaction(it, config) }
         val sb = StringBuilder()
         sb.append(HEADERS.joinToString("\t")).append('\n')
         rows.forEach { row ->
@@ -190,11 +187,11 @@ object MoneyManagerExporter {
                     row.account,
                     row.category,
                     row.subcategory,
-                    escape(row.note),
+                    row.note,
                     row.amount,
                     row.incomeExpense,
-                    escape(row.description)
-                ).joinToString("\t")
+                    row.description
+                ).joinToString("\t") { escape(it) }
             ).append('\n')
         }
         return sb.toString()

@@ -115,6 +115,15 @@ class SplitwiseAuthStore(context: Context) {
         clearWebViewCookies()
     }
 
+    /** Drops only the stored web session (cookies + CSRF); keeps OAuth app credentials and tokens. */
+    fun clearWebSession() {
+        secure.edit()
+            .remove(KEY_SESSION_COOKIE)
+            .remove(KEY_USER_CREDENTIALS)
+            .remove(KEY_CSRF_TOKEN)
+            .apply()
+    }
+
     fun signOut() {
         clearExpiredSession()
         prefs.edit()
@@ -161,6 +170,11 @@ class SplitwiseAuthStore(context: Context) {
     }
 
     companion object {
+        /** Fails closed: with no saved state this app never started the sign-in, so a code
+         *  arriving on the exported deep link may be an attacker's (login CSRF). */
+        fun isValidOAuthState(expected: String?, received: String?): Boolean =
+            !expected.isNullOrBlank() && expected == received
+
         const val REDIRECT_URI = "paymentsmstracker://oauth/splitwise"
         private const val TAG = "SplitwiseAuthStore"
         private const val PREFS_NAME = "splitwise_auth"
@@ -184,21 +198,39 @@ class SplitwiseAuthStore(context: Context) {
                 .getOrDefault(SplitwiseAuthMethod.NONE)
         }
 
+        /** True once a secrets store had to fall back to unencrypted prefs; Admin warns about it. */
+        @Volatile
+        var plaintextFallbackActive = false
+            private set
+
         fun createSecurePrefs(context: Context, name: String = PREFS_SECURE): SharedPreferences {
-            return try {
+            fun open(): SharedPreferences {
                 val masterKey = MasterKey.Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
-                EncryptedSharedPreferences.create(
+                return EncryptedSharedPreferences.create(
                     context,
                     name,
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
-            } catch (e: Exception) {
-                Log.e(TAG, "Encrypted prefs unavailable; using private SharedPreferences", e)
-                context.getSharedPreferences(name, Context.MODE_PRIVATE)
+            }
+            return try {
+                open()
+            } catch (first: Exception) {
+                // Usual cause: the file's keyset no longer matches the Keystore key (restore,
+                // key invalidation). The secrets are re-enterable, so reset the file and retry.
+                Log.e(TAG, "Encrypted prefs $name unreadable; resetting", first)
+                context.deleteSharedPreferences(name)
+                try {
+                    open()
+                } catch (e: Exception) {
+                    // Separate file name, so a later successful encrypted open never reads plaintext.
+                    Log.e(TAG, "Encrypted prefs unavailable; using private plaintext prefs", e)
+                    plaintextFallbackActive = true
+                    context.getSharedPreferences("${name}_plain", Context.MODE_PRIVATE)
+                }
             }
         }
 

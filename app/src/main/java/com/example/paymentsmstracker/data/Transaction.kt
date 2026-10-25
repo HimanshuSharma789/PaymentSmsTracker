@@ -9,8 +9,18 @@ object ReviewStatus {
     const val REVIEWED = "reviewed"
     const val EXPORTED = "exported"
 
+    val ALL = setOf(NEEDS_REVIEW, REVIEWED, EXPORTED)
+
     fun canPushToSplitwise(status: String): Boolean =
         status == REVIEWED || status == EXPORTED
+
+    /** Status after saving an edit. An exported row stays exported: demoting it would
+     *  export it to Money Manager a second time. */
+    fun afterSave(previous: String?, markReviewed: Boolean): String = when {
+        previous == EXPORTED -> EXPORTED
+        markReviewed -> REVIEWED
+        else -> NEEDS_REVIEW
+    }
 }
 
 /** Values stored in [Transaction.splitwiseExpenseId]. */
@@ -80,6 +90,13 @@ data class Transaction(
         participants.split(',')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
+
+    /** Mirrors the DAO's PENDING_SPLIT: exported, shared, not yet on Splitwise. Bulk deletes keep these. */
+    fun isPendingSplitwisePush(): Boolean =
+        reviewStatus == ReviewStatus.EXPORTED &&
+            splitwiseExpenseId == SplitwiseExpenseIds.PENDING &&
+            participants.isNotBlank() &&
+            !participants.trim().equals("ME", ignoreCase = true)
 
     fun participantIdMap(): Map<String, Long> = parseParticipantIds(splitwiseParticipantIds)
 
