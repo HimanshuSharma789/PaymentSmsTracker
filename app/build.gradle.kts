@@ -19,8 +19,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Single source of the version. Bump versionCode by 1 for every upload to any Play track.
-        versionCode = 3
-        versionName = "1.3.0"
+        versionCode = 4
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
