@@ -13,6 +13,7 @@
         android:layout_height="wrap_content"
         android:text="@string/list_send_label"
         android:textAppearance="?attr/textAppearanceBodySmall"
+        android:fontFamily="@font/outfit_500"
         android:textFontWeight="500"
         android:textSize="14sp"
         tools:ignore="UnusedAttribute" />

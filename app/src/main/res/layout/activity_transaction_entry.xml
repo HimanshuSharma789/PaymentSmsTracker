@@ -155,6 +155,7 @@
                     android:labelFor="@id/editTextAmount"
                     android:text="₹"
                     android:textColor="?attr/colorOnSurface"
+                    android:fontFamily="@font/outfit_300"
                     android:textFontWeight="300"
                     android:textSize="28sp"
                     tools:ignore="HardcodedText"
