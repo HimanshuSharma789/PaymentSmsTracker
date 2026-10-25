@@ -86,6 +86,8 @@
     editView.hidden = view !== "edit";
   }
 
+  const STATUS_LABEL = { needs_review: "To review", reviewed: "Reviewed", exported: "Sent to MM" };
+
   function money(n) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(n || 0);
   }
@@ -291,6 +293,7 @@
       transfer ? "Description (optional)" : "Merchant";
     document.getElementById("subcategoryLabel").hidden = transfer;
     document.getElementById("splitFieldset").hidden = transfer;
+    document.getElementById("splitSection").hidden = transfer;
     document.getElementById("splitModeLabel").hidden = transfer;
     if (transfer) {
       allocationBox.hidden = true;
@@ -395,48 +398,94 @@
     el.textContent = shown === total ? `${total} shown` : `${shown} of ${total}`;
   }
 
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const CHEV = '<svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+  function dayLabel(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    const key = (x) => x.getFullYear() * 400 + x.getMonth() * 31 + x.getDate();
+    const yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (key(d) === key(today)) return "Today";
+    if (key(d) === key(yest)) return "Yesterday";
+    const yr = d.getFullYear() === today.getFullYear() ? "" : ` ${d.getFullYear()}`;
+    return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${yr}`;
+  }
+
+  function monogram(tx) {
+    const t = (tx.merchantName || "").trim();
+    return escapeHtml(t ? Array.from(t)[0] : "?");
+  }
+
+  function rowHtml(tx) {
+    const type = normalizeType(tx.transactionType);
+    const tags = type === "Transfer-Out"
+      ? `<span class="tag">${escapeHtml(tx.account || "?")} → ${escapeHtml(tx.category || "?")}</span>`
+      : [tx.category || "Uncategorized", tx.account].filter(Boolean)
+          .map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+    const st = tx.reviewStatus || "needs_review";
+    const checked = selectedIds.has(String(tx.id));
+    const lead = selectMode
+      ? `<input type="checkbox" class="itemCheck" ${checked ? "checked" : ""} aria-label="Select ${escapeHtml(tx.merchantName)}" />`
+      : `<div class="mono" aria-hidden="true">${monogram(tx)}</div>`;
+    const sign = type === "Income" ? "+" : "";
+    return `<article class="item${selectMode ? " selectMode" : ""}${checked ? " selected" : ""}" tabindex="0" role="button" data-id="${tx.id}" data-status="${escapeHtml(st)}" data-type="${escapeHtml(type)}">
+      ${lead}
+      <div class="main">
+        <div class="merchant">${escapeHtml(tx.merchantName || (type === "Transfer-Out" ? "Transfer" : "Untitled"))}</div>
+        <div class="tags">${tags}<span class="time">${formatTime(tx.timestamp)}</span></div>
+      </div>
+      <div class="side">
+        <div class="amount">${sign}<span class="cur">₹</span>${money(tx.amount).replace("₹", "")}</div>
+        <span class="pill ${escapeHtml(st)}">${escapeHtml(STATUS_LABEL[st] || st)}</span>
+      </div>
+      ${CHEV}
+    </article>`;
+  }
+
+  function activate(el, ev) {
+    const id = String(el.dataset.id);
+    if (selectMode) {
+      if (ev && ev.target.classList.contains("itemCheck")) return;
+      const box = el.querySelector(".itemCheck");
+      if (!box) return;
+      box.checked = !box.checked;
+      if (box.checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+      el.classList.toggle("selected", box.checked);
+      refreshBulkBar();
+      return;
+    }
+    openEdit(Number(id));
+  }
+
   function renderList() {
     const filtered = filteredItems();
     listEmpty.hidden = filtered.length > 0;
+    if (!listEmpty.hidden) {
+      const idle = items.length === 0 && currentFilter === "needs_review";
+      document.getElementById("emptyTitle").textContent = idle ? "Nothing waiting on you" : "No transactions here";
+      document.getElementById("emptyHint").textContent = idle
+        ? "Press New to add a transaction by hand."
+        : (items.length ? "Try clearing the filters." : "Press New to add one.");
+    }
     updateFilterCount(filtered.length, items.length);
+    let lastDay = "";
     listEl.innerHTML = filtered.map((tx) => {
-      const type = normalizeType(tx.transactionType);
-      const metaLine = type === "Transfer-Out"
-        ? `${tx.account || "?"} → ${tx.category || "?"}`
-        : ([tx.account, tx.category].filter(Boolean).join(" · ") || "Uncategorized");
-      const st = tx.reviewStatus || "needs_review";
-      const status = currentFilter ? "" : `<div class="status ${escapeHtml(st)}">${escapeHtml(st)}</div>`;
-      const checked = selectedIds.has(String(tx.id));
-      const check = selectMode
-        ? `<input type="checkbox" class="itemCheck" ${checked ? "checked" : ""} aria-label="Select" />`
-        : "";
-      return `<article class="item${selectMode ? " selectMode" : ""}${checked ? " selected" : ""}" data-id="${tx.id}" data-status="${escapeHtml(st)}" data-type="${escapeHtml(type)}">
-        ${check}
-        <div>
-          <div class="merchant">${escapeHtml(tx.merchantName)}</div>
-          <div class="meta"><span class="typePill ${escapeHtml(type)}">${escapeHtml(type)}</span> · ${escapeHtml(metaLine)} · ${ymd(tx.timestamp)} ${formatTime(tx.timestamp)}</div>
-        </div>
-        <div>
-          <div class="amount">${money(tx.amount)}</div>
-          ${status}
-        </div>
-      </article>`;
+      const day = ymd(tx.timestamp);
+      let head = "";
+      if (day !== lastDay) {
+        lastDay = day;
+        head = `<h2 class="dayHead">${escapeHtml(dayLabel(tx.timestamp))}</h2>`;
+      }
+      return head + rowHtml(tx);
     }).join("");
     listEl.querySelectorAll(".item").forEach((el) => {
-      el.addEventListener("click", (ev) => {
-        const id = String(el.dataset.id);
-        if (selectMode) {
-          if (ev.target.classList.contains("itemCheck")) return;
-          const box = el.querySelector(".itemCheck");
-          if (!box) return;
-          box.checked = !box.checked;
-          if (box.checked) selectedIds.add(id);
-          else selectedIds.delete(id);
-          el.classList.toggle("selected", box.checked);
-          refreshBulkBar();
-          return;
-        }
-        openEdit(Number(id));
+      el.addEventListener("click", (ev) => activate(el, ev));
+      el.addEventListener("keydown", (ev) => {
+        if (ev.target !== el) return;
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(el, null); }
       });
       el.querySelector(".itemCheck")?.addEventListener("change", (ev) => {
         const id = String(el.dataset.id);
@@ -447,6 +496,65 @@
       });
     });
     refreshBulkBar();
+  }
+
+  // ---- hero summary (client-side, mirrors home/HomeSummary.kt: spend = my share of Expense rows) ----
+  let allItems = null;
+
+  function myShare(tx) {
+    const sp = tx.splitPreview;
+    const v = sp && sp.myShare != null ? Number(sp.myShare) : NaN;
+    return Number.isFinite(v) ? v : (Number(tx.amount) || 0);
+  }
+
+  function inr0(n) {
+    return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(Math.round(n || 0));
+  }
+
+  function renderHero() {
+    const hero = document.getElementById("hero");
+    if (!allItems) { hero.classList.add("loading"); return; }
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    const lastCut = new Date(lastStart.getFullYear(), lastStart.getMonth(), Math.min(now.getDate(), lastDays) + 1).getTime();
+    let spent = 0, last = 0, count = 0, review = 0, ready = 0, readyN = 0;
+    allItems.forEach((tx) => {
+      const st = tx.reviewStatus || "needs_review";
+      if (st === "needs_review") review++;
+      if (st === "reviewed") { readyN++; ready += myShare(tx); }
+      if (normalizeType(tx.transactionType) !== "Expense") return;
+      if (tx.timestamp >= monthStart && tx.timestamp <= now.getTime()) { spent += myShare(tx); count++; }
+      else if (tx.timestamp >= lastStart.getTime() && tx.timestamp < lastCut) last += myShare(tx);
+    });
+    document.getElementById("heroLabel").textContent = `Spent in ${now.toLocaleString("en-US", { month: "long" })}`;
+    document.getElementById("heroAmt").textContent = inr0(spent);
+    const tag = document.getElementById("heroTag");
+    const prev = lastStart.toLocaleString("en-US", { month: "long" });
+    const diff = Math.round(spent) - Math.round(last);
+    tag.hidden = last <= 0;
+    if (last > 0) {
+      tag.innerHTML = diff === 0
+        ? `Same as ${prev} so far`
+        : `<span class="cur">₹</span>${inr0(Math.abs(diff))} ${diff > 0 ? "more" : "less"} than ${prev} so far`;
+    }
+    document.getElementById("heroReview").textContent = String(review);
+    document.getElementById("heroReady").textContent = inr0(ready);
+    document.getElementById("heroReadySub").textContent =
+      `${readyN} reviewed, not sent yet`;
+    const badge = document.getElementById("reviewBadge");
+    badge.textContent = String(review);
+    badge.hidden = review === 0;
+    hero.classList.remove("loading");
+  }
+
+  async function refreshSummary() {
+    try {
+      const data = await api("/api/transactions");
+      allItems = data.items || [];
+      renderHero();
+    } catch (_) { /* keep the previous numbers */ }
   }
 
   function escapeHtml(s) {
@@ -475,6 +583,8 @@
     fillFilterControls();
     renderList();
     refreshStatus();
+    if (currentFilter) refreshSummary();
+    else { allItems = items; renderHero(); }
   }
 
   async function openEdit(id) {
@@ -640,6 +750,8 @@
     document.getElementById("logoutBtn").onclick = () => {
       if (openAccess) return;
       token = "";
+      allItems = null;
+      renderHero();
       sessionStorage.removeItem(TOKEN_KEY);
       show("login");
     };

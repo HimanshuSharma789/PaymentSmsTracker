@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
+    android:minHeight="52dp"
     android:orientation="horizontal"
     android:paddingVertical="4dp">
 
@@ -12,19 +14,29 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        tools:text="PUNEET" />
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        tools:text="Rahul" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/layoutAllocationValue"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
         android:layout_width="120dp"
         android:layout_height="wrap_content"
-        android:hint="@string/split_value_hint">
+        android:hint="@string/split_value_hint"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeColor="?attr/colorOnSurface">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editAllocationValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:gravity="end"
             android:inputType="numberDecimal"
             android:maxLines="1"
             android:singleLine="true" />

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating black pill nav shared by the top-level screens; MonoNav.bind wires it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/monoNav"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|center_horizontal"
+    android:layout_marginBottom="20dp"
+    android:background="@drawable/bg_mono_nav"
+    android:elevation="10dp"
+    android:orientation="horizontal"
+    android:padding="6dp">
+
+    <ImageButton
+        android:id="@+id/navHome"
+        style="@style/Widget.Mono.NavButton"
+        android:contentDescription="@string/nav_home"
+        android:src="@drawable/ic_mono_home" />
+
+    <ImageButton
+        android:id="@+id/navAll"
+        style="@style/Widget.Mono.NavButton"
+        android:contentDescription="@string/nav_all"
+        android:src="@drawable/ic_mono_list" />
+
+    <ImageButton
+        android:id="@+id/navAsk"
+        style="@style/Widget.Mono.NavButton"
+        android:contentDescription="@string/nav_ask"
+        android:src="@drawable/ic_mono_sparkle" />
+
+    <ImageButton
+        android:id="@+id/navSplits"
+        style="@style/Widget.Mono.NavButton"
+        android:contentDescription="@string/nav_splits"
+        android:src="@drawable/ic_mono_people" />
+
+    <ImageButton
+        android:id="@+id/navSend"
+        style="@style/Widget.Mono.NavButton"
+        android:contentDescription="@string/nav_send"
+        android:src="@drawable/ic_mono_send" />
+</LinearLayout>

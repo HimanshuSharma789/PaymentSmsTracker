@@ -15,11 +15,14 @@ object ThemeMode {
 
     val ALL = listOf(LIGHT, SYSTEM, DYNAMIC)
 
+    /** Mono palette, light or dark with the system. Dynamic color would repaint it, so it is opt-in. */
+    const val DEFAULT = SYSTEM
+
     fun normalize(raw: String?): String = when (raw?.lowercase()?.trim()) {
         LIGHT -> LIGHT
         SYSTEM -> SYSTEM
         DYNAMIC -> DYNAMIC
-        else -> DYNAMIC
+        else -> DEFAULT
     }
 
     fun usesDynamicColor(mode: String): Boolean =

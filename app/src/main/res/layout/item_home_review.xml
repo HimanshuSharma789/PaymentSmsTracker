@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="72dp"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/textReviewMonogram"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_mono_circle_ink"
+            android:gravity="center"
+            android:importantForAccessibility="no"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/mono_on_ink"
+            tools:text="S" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/textReviewMerchant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                tools:text="Swiggy" />
+
+            <TextView
+                android:id="@+id/textReviewMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                tools:text="HDFC ••2149 · Food / Delivery" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/textReviewAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="10dp"
+            android:textAppearance="@style/TextAppearance.Mono.Amount"
+            tools:text="₹450" />
+
+        <ImageButton
+            android:id="@+id/buttonReviewConfirm"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_mono_check"
+            tools:ignore="ContentDescription" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonReviewChoose"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="44dp"
+            android:text="@string/mono_choose"
+            android:visibility="gone" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

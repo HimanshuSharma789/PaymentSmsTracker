@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Payment SMS Tracker</title>
   <link rel="stylesheet" href="/style.css" />
+  <script src="/theme.js"></script>
 </head>
 <body>
   <div id="app">
     <section id="loginView" class="panel">
-      <h1>PC Manager</h1>
+      <h1>PC <mark>Manager</mark></h1>
       <p class="muted">Enter the 6-digit code shown in the Android Admin → PC Manager panel.</p>
       <label>Access code
-        <input id="codeInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+        <input id="codeInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="······" />
       </label>
       <button id="loginBtn" class="primary">Continue</button>
       <p id="loginError" class="error" hidden></p>
@@ -27,18 +28,36 @@
         <div class="topActions">
           <a id="sheetLink" class="secondary btnLink" href="/sheet.html">Sheet view</a>
           <button id="selectModeBtn" class="secondary">Select</button>
-          <button id="newBtn" class="primary">New</button>
+          <button id="newBtn" class="primary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
           <button id="logoutBtn" class="ghost">Logout</button>
         </div>
       </header>
 
+      <section id="hero" class="hero loading" aria-label="Summary">
+        <div class="heroMain">
+          <p class="heroLabel" id="heroLabel">Spent this month</p>
+          <div class="heroNum"><span class="cur">₹</span><span id="heroAmt">0</span></div>
+          <span id="heroTag" class="tag heroTag"></span>
+        </div>
+        <div class="card yellow">
+          <span class="cardLabel">To review</span>
+          <span class="cardNum" id="heroReview">0</span>
+          <span class="cardSub">waiting on you</span>
+        </div>
+        <div class="card">
+          <span class="cardLabel">Ready to send</span>
+          <span class="cardNum"><span class="cur">₹</span><span id="heroReady">0</span></span>
+          <span class="cardSub" id="heroReadySub">reviewed, not sent yet</span>
+        </div>
+      </section>
+
       <div class="filters">
-        <button data-status="needs_review" class="chip active">Needs review</button>
+        <button data-status="needs_review" class="chip active">To review<span id="reviewBadge" class="badge" hidden>0</span></button>
         <button data-status="reviewed" class="chip">Reviewed</button>
         <button data-status="" class="chip">All</button>
       </div>
       <div class="filterRow">
-        <input id="searchInput" type="search" placeholder="Search merchant, notes, amount, SMS…" />
+        <div class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="searchInput" type="search" aria-label="Search" placeholder="Search merchant, amount, SMS…" title="Search merchant, notes, amount, SMS" /></div>
         <select id="filterAccount" aria-label="Account">
           <option value="">All accounts</option>
         </select>
@@ -68,7 +87,11 @@
       </div>
 
       <div id="list" class="list"></div>
-      <p id="listEmpty" class="muted" hidden>No transactions</p>
+      <div id="listEmpty" class="empty" hidden>
+        <div class="hatchDot" aria-hidden="true"></div>
+        <h2 id="emptyTitle">Nothing waiting on you</h2>
+        <p id="emptyHint">Press New to add a transaction by hand.</p>
+      </div>
     </section>
 
     <section id="editView" class="panel" hidden>
@@ -78,58 +101,72 @@
       </header>
 
       <form id="editForm" class="form">
-        <label>Amount
-          <input name="amount" type="number" step="0.01" min="0" required />
-        </label>
-        <label id="merchantLabel">Merchant
-          <input name="merchantName" />
-        </label>
-        <label>Type
-          <select name="transactionType" id="transactionTypeSelect">
-            <option value="Expense">Expense</option>
-            <option value="Income">Income</option>
-            <option value="Transfer-Out">Transfer-Out</option>
-          </select>
-        </label>
-        <label id="accountLabel">Account
-          <select name="account" id="accountSelect"></select>
-        </label>
-        <label id="categoryLabel">Category
-          <select name="category" id="categorySelect"></select>
-        </label>
-        <label id="subcategoryLabel">Subcategory
-          <select name="subcategory" id="subcategorySelect"></select>
-        </label>
-        <label>Date & time
-          <input name="date" type="datetime-local" required />
-        </label>
-        <label>Notes
-          <input name="notes" />
-        </label>
-        <fieldset id="splitFieldset">
-          <legend>Splitwise</legend>
-          <label class="tight">Group
-            <select name="splitwiseGroupId" id="splitwiseGroupSelect">
-              <option value="0">No Splitwise group</option>
+        <div class="sec">
+          <h2>Amount</h2>
+          <label class="amountField">Amount
+            <span class="amtWrap"><span class="cur" aria-hidden="true">₹</span><input name="amount" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0" required /></span>
+          </label>
+        </div>
+        <div class="sec">
+          <h2>Details</h2>
+          <label id="merchantLabel">Merchant
+            <input name="merchantName" />
+          </label>
+          <div class="grid2">
+            <label>Type
+              <select name="transactionType" id="transactionTypeSelect">
+                <option value="Expense">Expense</option>
+                <option value="Income">Income</option>
+                <option value="Transfer-Out">Transfer-Out</option>
+              </select>
+            </label>
+            <label id="accountLabel">Account
+              <select name="account" id="accountSelect"></select>
+            </label>
+            <label id="categoryLabel">Category
+              <select name="category" id="categorySelect"></select>
+            </label>
+            <label id="subcategoryLabel">Subcategory
+              <select name="subcategory" id="subcategorySelect"></select>
+            </label>
+          </div>
+          <label>Date & time
+            <input name="date" type="datetime-local" required />
+          </label>
+        </div>
+        <div class="sec" id="splitSection">
+          <h2>Splitwise</h2>
+          <fieldset id="splitFieldset">
+            <legend>Splitwise</legend>
+            <label class="tight">Group
+              <select name="splitwiseGroupId" id="splitwiseGroupSelect">
+                <option value="0">No Splitwise group</option>
+              </select>
+            </label>
+            <p class="detailLabel tight">Members</p>
+            <div id="participantChips" class="chips"></div>
+            <p id="splitwiseHint" class="muted detailHint" hidden></p>
+          </fieldset>
+          <label id="splitModeLabel">Split mode
+            <select name="splitMode" id="splitModeSelect">
+              <option value="equal">equal</option>
+              <option value="exact">exact</option>
+              <option value="percent">percent</option>
+              <option value="weight">weight</option>
             </select>
           </label>
-          <p class="detailLabel tight">Members</p>
-          <div id="participantChips" class="chips"></div>
-          <p id="splitwiseHint" class="muted detailHint" hidden></p>
-        </fieldset>
-        <label id="splitModeLabel">Split mode
-          <select name="splitMode" id="splitModeSelect">
-            <option value="equal">equal</option>
-            <option value="exact">exact</option>
-            <option value="percent">percent</option>
-            <option value="weight">weight</option>
-          </select>
-        </label>
-        <div id="allocationBox" class="alloc" hidden></div>
+          <div id="allocationBox" class="alloc" hidden></div>
+        </div>
+        <div class="sec">
+          <h2>Notes</h2>
+          <label class="hideLabel">Notes
+            <input name="notes" />
+          </label>
+        </div>
         <p id="editError" class="error" hidden></p>
-        <div class="row">
+        <div class="actionBar">
           <button type="submit" class="primary">Save</button>
-          <button type="button" id="reviewBtn" class="secondary">Mark reviewed</button>
+          <button type="button" id="reviewBtn" class="yellowBtn">Mark reviewed</button>
           <button type="button" id="deleteBtn" class="danger">Delete</button>
         </div>
       </form>

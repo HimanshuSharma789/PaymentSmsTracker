@@ -184,7 +184,7 @@ class ConfigStore(context: Context) {
                 nightlyReviewReminderEnabled = obj.optBoolean("nightlyReviewReminderEnabled", true),
                 nightlyReviewHour = obj.optInt("nightlyReviewHour", 21).coerceIn(0, 23),
                 nightlyReviewMinute = obj.optInt("nightlyReviewMinute", 0).coerceIn(0, 59),
-                themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DYNAMIC)),
+                themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DEFAULT)),
                 bankSenderTokens = obj.optJSONArray("bankSenderTokens")?.toStringList()
                     ?: AppConfig.DEFAULT_BANK_SENDER_TOKENS
             )

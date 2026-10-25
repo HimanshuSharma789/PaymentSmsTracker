@@ -1,5 +1,6 @@
 package com.example.paymentsmstracker.adapter
 
+import com.example.paymentsmstracker.home.Money
 import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
@@ -112,8 +113,8 @@ class SplitTableAdapter(
             }
         }
         holder.breakdown.text =
-            context.getString(R.string.split_row_breakdown, row.total, row.myShare)
-        holder.friendsOwe.text = context.getString(R.string.split_row_amount, row.friendsOwe)
+            Money.styled(context.getString(R.string.split_row_breakdown, row.total, row.myShare))
+        holder.friendsOwe.text = Money.styled(context.getString(R.string.split_row_amount, row.friendsOwe))
 
         val statusLabel: Int
         val statusBackground: Int
