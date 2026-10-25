@@ -1,192 +1,279 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/mono_bg"
     android:fitsSystemWindows="true"
     tools:context=".MainActivity">
-
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbarHome"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:title="@string/payment_sms_tracker" />
-    </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:clipToPadding="false"
+        android:paddingBottom="112dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:paddingStart="20dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/textHomeDate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="Thursday, 16 October" />
+
+                <ImageButton
+                    android:id="@+id/buttonHomeAdd"
+                    style="@style/Widget.Mono.IconButton"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="@string/mono_add"
+                    android:src="@drawable/ic_mono_plus" />
+
+                <ImageButton
+                    android:id="@+id/buttonHomeSettings"
+                    style="@style/Widget.Mono.IconButton"
+                    android:contentDescription="@string/mono_settings"
+                    android:src="@drawable/ic_mono_sliders" />
+            </LinearLayout>
 
             <TextView
+                android:id="@+id/textHomeSpentLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/home_whats_left"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
+                android:layout_marginTop="14dp"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                tools:text="Spent in October" />
 
             <TextView
-                android:id="@+id/textHomeSummary"
-                android:layout_width="match_parent"
+                android:id="@+id/textHomeHero"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                tools:text="3 to review · 2 ready for Money Manager · 1 split pending" />
+                android:fontFeatureSettings="tnum"
+                android:includeFontPadding="false"
+                android:textAppearance="?attr/textAppearanceDisplayLarge"
+                tools:text="₹38,420" />
+
+            <TextView
+                android:id="@+id/textHomeDelta"
+                style="@style/Widget.Mono.Tag.Yellow"
+                android:layout_marginTop="10dp"
+                android:drawablePadding="4dp"
+                tools:text="₹4,100 less than September so far" />
 
             <com.google.android.material.card.MaterialCardView
-                style="?attr/materialCardViewOutlinedStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="22dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingVertical="4dp">
+                    android:padding="18dp">
 
                     <LinearLayout
-                        android:id="@+id/rowHomeReview"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
-
-                        <TextView
-                            android:id="@+id/textHomeReviewCount"
-                            android:layout_width="48dp"
-                            android:layout_height="wrap_content"
-                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                            android:textStyle="bold"
-                            tools:text="3" />
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="@string/home_to_review"
-                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+                            android:text="@string/mono_last_7_days"
+                            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                        <TextView
+                            android:id="@+id/textHomeWeekTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            tools:text="₹18,320 total" />
                     </LinearLayout>
 
-                    <com.google.android.material.divider.MaterialDivider
+                    <com.example.paymentsmstracker.ui.WeekBarsView
+                        android:id="@+id/weekBars"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <LinearLayout
-                        android:id="@+id/rowHomeReadyMm"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
-
-                        <TextView
-                            android:id="@+id/textHomeReadyCount"
-                            android:layout_width="48dp"
-                            android:layout_height="wrap_content"
-                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                            android:textStyle="bold"
-                            tools:text="2" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/home_ready_for_mm"
-                            android:textAppearance="?attr/textAppearanceBodyLarge" />
-                    </LinearLayout>
-
-                    <com.google.android.material.divider.MaterialDivider
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <LinearLayout
-                        android:id="@+id/rowHomeSplits"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
-
-                        <TextView
-                            android:id="@+id/textHomeSplitsCount"
-                            android:layout_width="48dp"
-                            android:layout_height="wrap_content"
-                            android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                            android:textStyle="bold"
-                            tools:text="1" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/home_splits_pending"
-                            android:textAppearance="?attr/textAppearanceBodyLarge" />
-                    </LinearLayout>
+                        android:layout_height="170dp"
+                        android:layout_marginTop="10dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonHomePrimary"
-                style="@style/Widget.Material3.Button.Icon"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/home_cta_review"
-                app:icon="@drawable/baseline_history_24" />
+                android:layout_marginTop="28dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_go_to_transaction"
-                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mono_review"
+                    android:fontFamily="@font/outfit_700" android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+                <TextView
+                    android:id="@+id/textHomeLeft"
+                    style="@style/Widget.Mono.Tag"
+                    tools:text="4 left" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textHomeReviewHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/mono_review_hint"
+                android:textAppearance="?attr/textAppearanceBodySmall" />
+
+            <LinearLayout
+                android:id="@+id/containerHomeReview"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="@string/add_new_transaction"
-                app:icon="@drawable/outline_attach_money_24" />
+                android:animateLayoutChanges="true"
+                android:orientation="vertical" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_view_all_transactions"
-                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+            <TextView
+                android:id="@+id/textHomeReviewEmpty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/view_all_transactions"
-                app:icon="@drawable/baseline_history_24" />
+                android:layout_marginTop="4dp"
+                android:text="@string/mono_review_empty"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonHomeAgentChat"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:id="@+id/buttonHomeSeeAll"
+                style="@style/Widget.Mono.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone"
+                tools:text="See all 9 to review"
+                tools:visibility="visible" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardHomeReady"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/agent_chat_open"
-                app:icon="@drawable/baseline_auto_awesome_24" />
+                android:layout_marginTop="20dp"
+                app:cardBackgroundColor="@color/mono_yellow">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="18dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/mono_ready_title"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="@color/mono_on_yellow_meta" />
+
+                        <TextView
+                            android:id="@+id/textHomeReadyTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFeatureSettings="tnum"
+                            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                            android:textColor="@color/mono_on_yellow"
+                            tools:text="₹6,210" />
+
+                        <TextView
+                            android:id="@+id/textHomeReadySub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="@color/mono_on_yellow_meta"
+                            tools:text="7 reviewed, not sent yet" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonHomeSend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mono_send"
+                        app:backgroundTint="@color/mono_on_yellow"
+                        android:textColor="@android:color/white" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardHomeSplits"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="18dp">
+
+                    <ImageView
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_mono_circle_ink"
+                        android:importantForAccessibility="no"
+                        android:scaleType="center"
+                        android:src="@drawable/ic_mono_people"
+                        app:tint="@color/mono_on_ink" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/mono_splits_title"
+                            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                        <TextView
+                            android:id="@+id/textHomeSplitsSub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            tools:text="2 shared bills not on Splitwise yet" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <include layout="@layout/view_mono_nav" />
+</FrameLayout>

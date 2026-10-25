@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="4dp">
 
+    <!-- Mono pill; OptionPickerBottomSheet thickens the stroke on the selected option. -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonOption"
-        style="@style/Widget.Material3.Button.OutlinedButton"
+        style="@style/Widget.Mono.Button.Outlined"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:maxLines="2"
         android:minHeight="48dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:textAllCaps="false"
-        app:cornerRadius="12dp" />
+        android:textSize="14.5sp" />
 </FrameLayout>

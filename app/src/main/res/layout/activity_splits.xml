@@ -1,121 +1,272 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/mono_bg"
     android:fitsSystemWindows="true"
     tools:context=".SplitsActivity">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbarSplits"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@drawable/outline_arrow_back_24"
-            app:title="@string/splits_title" />
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chipGroupSplits"
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBarSplits"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp"
-            app:selectionRequired="true"
-            app:singleSelection="true">
+            android:background="@color/mono_bg"
+            app:elevation="0dp"
+            app:liftOnScroll="false"
+            app:liftOnScrollColor="@android:color/transparent"
+            android:stateListAnimator="@null">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipSplitsPending"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/splits_filter_pending" />
+                android:orientation="vertical"
+                app:layout_scrollFlags="scroll">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipSplitsSuccess"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/splits_filter_success" />
-        </com.google.android.material.chip.ChipGroup>
+                <com.google.android.material.appbar.MaterialToolbar
+                    android:id="@+id/toolbarSplits"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="4dp"
+                    app:contentInsetStart="20dp"
+                    app:contentInsetStartWithNavigation="0dp"
+                    app:title="@string/splits_title"
+                    app:titleTextAppearance="@style/TextAppearance.Mono.H1">
 
-        <TextView
-            android:id="@+id/textSplitsSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="?attr/colorSurfaceVariant"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp"
-            android:textAppearance="?attr/textAppearanceLabelLarge"
-            tools:text="3 pending · friends owe ₹225.00" />
+                </com.google.android.material.appbar.MaterialToolbar>
+
+                <LinearLayout
+                    android:id="@+id/rowSplitsConnection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="20dp"
+                    android:paddingTop="8dp">
+
+                    <TextView
+                        android:id="@+id/textSplitsConnection"
+                        style="@style/Widget.Mono.Tag"
+                        android:drawableStart="@drawable/bg_mono_dot_hollow"
+                        android:drawablePadding="8dp"
+                        android:textSize="13sp"
+                        tools:text="Not connected" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonSplitsConnect"
+                        style="@style/Widget.Mono.Button"
+                        android:backgroundTint="@color/mono_ink"
+                        android:textColor="@color/mono_on_ink"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="44dp"
+                        android:text="@string/splits_mono_connect" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="20dp">
+
+                    <TextView
+                        android:id="@+id/textSplitsHeroLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/splits_mono_owed_to_you"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/textSplitsHero"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFeatureSettings="tnum"
+                        android:includeFontPadding="false"
+                        android:textAppearance="?attr/textAppearanceDisplayLarge"
+                        tools:text="₹4,800" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/textSplitsToPush"
+                            style="@style/Widget.Mono.Tag.Yellow"
+                            android:layout_marginEnd="8dp"
+                            tools:text="2 to push" />
+
+                        <TextView
+                            android:id="@+id/textSplitsSummary"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="2"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            tools:text="3 people · 3 bills" />
+                    </LinearLayout>
+
+                    <HorizontalScrollView
+                        android:id="@+id/scrollSplitsPeople"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:clipToPadding="false"
+                        android:fillViewport="true"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/containerSplitsPeople"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="26dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/splits_mono_shared_bills"
+                                android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/splits_mono_one_per_bill"
+                                android:textAppearance="?attr/textAppearanceBodySmall" />
+                        </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonExportSplitwiseFromSplits"
+                            style="@style/Widget.Mono.Button.Text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:text="@string/splits_mono_export_csv" />
+                    </LinearLayout>
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroupSplits"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitsPending"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="@string/splits_filter_pending"
+                            app:checkedIconVisible="false" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipSplitsSuccess"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/splits_filter_success"
+                            app:checkedIconVisible="false" />
+                    </com.google.android.material.chip.ChipGroup>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.appbar.AppBarLayout>
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerSplitsTable"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingTop="6dp"
-                android:paddingBottom="8dp"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="190dp"
                 tools:listitem="@layout/item_split_row" />
 
             <TextView
                 android:id="@+id/textSplitsEmpty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
+                android:layout_gravity="top"
                 android:gravity="center"
-                android:padding="24dp"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="40dp"
                 android:text="@string/no_splits_yet"
-                android:textColor="?android:textColorSecondary"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:visibility="gone"
                 tools:visibility="visible" />
         </FrameLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
-        <com.google.android.material.divider.MaterialDivider
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+    <!-- Bulk actions: shown while selecting several bills (overflow → Select, or long-press a bill). -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardSplitsBulk"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="104dp"
+        android:visibility="gone"
+        app:cardElevation="8dp"
+        tools:visibility="visible">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonPushSplitwiseFromSplits"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="8dp"
-            android:text="@string/splitwise_select_and_push" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonMarkSuccessFromSplits"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="8dp"
-            android:text="@string/splitwise_mark_success" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonExportSplitwiseFromSplits"
-            style="@style/Widget.Material3.Button.TextButton"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginBottom="8dp"
-            android:text="@string/export_splitwise" />
-    </LinearLayout>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+            android:orientation="horizontal"
+            android:padding="10dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonPushSplitwiseFromSplits"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingHorizontal="12dp"
+                android:text="@string/splitwise_push_selected" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonMarkSuccessFromSplits"
+                style="@style/Widget.Mono.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:paddingHorizontal="12dp"
+                android:text="@string/splits_mono_mark_selected_added" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <include layout="@layout/view_mono_nav" />
+</FrameLayout>

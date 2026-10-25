@@ -2,11 +2,20 @@ package com.example.paymentsmstracker
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -19,27 +28,50 @@ import com.example.paymentsmstracker.adapter.TransactionAdapter
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
+import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.export.MoneyManagerSync
+import com.example.paymentsmstracker.home.Money
+import com.example.paymentsmstracker.list.TransactionQuery
+import com.example.paymentsmstracker.list.TransactionSort
 import com.example.paymentsmstracker.merchant.MerchantMemory
+import com.example.paymentsmstracker.ui.OptionPickerBottomSheet
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import androidx.core.widget.doAfterTextChanged
+import android.widget.EditText
+import com.example.paymentsmstracker.ui.HatchDrawable
+import com.example.paymentsmstracker.ui.MonoNav
 import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.example.paymentsmstracker.viewmodel.TransactionListViewModel
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.math.BigDecimal
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListener {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyStateTextView: TextView
     private lateinit var toolbar: MaterialToolbar
+    private lateinit var exportButton: MaterialButton
     private lateinit var transactionAdapter: TransactionAdapter
     private lateinit var db: AppDatabase
     private val transactionListViewModel: TransactionListViewModel by viewModels()
     private var selectionModeActive = false
     private var lastListCount: Int = 0
+    private var rawTransactions: List<Transaction> = emptyList()
+    private var query = ""
+    private lateinit var monoRows: MonoRows
+    private var sort = TransactionSort.NEWEST
+    private val searchRunnable = Runnable { applyList(scrollTop = true) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +80,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         toolbar = findViewById(R.id.toolbarTransactionList)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        // Mono: the H1 below the toolbar carries the title; the toolbar only shows it in selection mode.
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         toolbar.setNavigationOnClickListener {
             if (selectionModeActive) {
                 exitSelectionMode()
@@ -59,6 +93,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         db = AppDatabase.getDatabase(applicationContext)
         recyclerView = findViewById(R.id.recyclerViewTransactions)
         emptyStateTextView = findViewById(R.id.textViewEmptyState)
+        exportButton = findViewById(R.id.buttonListExport)
+        exportButton.setOnClickListener { confirmExportAllReviewed() }
 
         onBackPressedDispatcher.addCallback(
             this,
@@ -84,11 +120,93 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             runCatching { ListFilter.valueOf(it) }.getOrNull()
         } ?: ListFilter.NEEDS_REVIEW
         transactionListViewModel.setFilter(initialFilter)
+        MonoNav.bind(this, if (initialFilter == ListFilter.REVIEWED) MonoNav.Tab.SEND else MonoNav.Tab.ALL)
         checkFilterChip(initialFilter)
         setupFilterChips()
         setupRecyclerView()
         transactionAdapter.setListFilter(initialFilter)
+        setupSearchSort()
         observeViewModel()
+    }
+
+    private fun setupSearchSort() {
+        val prefs = getSharedPreferences("list_ui", MODE_PRIVATE)
+        sort = runCatching { TransactionSort.valueOf(prefs.getString("sort", null) ?: "") }
+            .getOrDefault(TransactionSort.NEWEST)
+        val edit = findViewById<EditText>(R.id.editListSearch)
+        val clear = findViewById<View>(R.id.buttonListSearchClear)
+        edit.doAfterTextChanged {
+            query = it?.toString().orEmpty()
+            clear.isVisible = query.isNotEmpty()
+            edit.removeCallbacks(searchRunnable)
+            edit.postDelayed(searchRunnable, 150)
+        }
+        edit.setOnEditorActionListener { v, action, _ ->
+            if (action == EditorInfo.IME_ACTION_SEARCH) {
+                getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(v.windowToken, 0)
+                v.clearFocus()
+                true
+            } else false
+        }
+        clear.setOnClickListener { edit.setText("") }
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING && edit.hasFocus()) {
+                    getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(edit.windowToken, 0)
+                    edit.clearFocus()
+                }
+            }
+        })
+        findViewById<View>(R.id.buttonListSort).setOnClickListener {
+            val labels = SORT_LABELS.map { (_, res) -> getString(res) }
+            OptionPickerBottomSheet.show(
+                this, getString(R.string.list_sort), labels,
+                getString(SORT_LABELS.first { it.first == sort }.second), spanCount = 1
+            ) { picked ->
+                sort = SORT_LABELS[labels.indexOf(picked)].first
+                prefs.edit().putString("sort", sort.name).apply()
+                applyList(scrollTop = true)
+            }
+        }
+    }
+
+    /** Filter + sort the raw rows and push them to the list. Search/sort are ignored in Send mode (REVIEWED). */
+    private fun applyList(scrollTop: Boolean = false) {
+        val filter = transactionListViewModel.currentFilter()
+        val sending = filter == ListFilter.REVIEWED
+        findViewById<View>(R.id.rowListSearch).isVisible = !sending
+        val q = if (sending) "" else query.trim()
+        val shown = if (sending) rawTransactions
+        else TransactionQuery.apply(rawTransactions, q, sort)
+        findViewById<View>(R.id.dotListSort).isVisible = !sending && sort != TransactionSort.NEWEST
+        transactionAdapter.setListFilter(filter)
+        val flat = !sending && sort != TransactionSort.NEWEST && sort != TransactionSort.OLDEST
+        if (monoRows.flat != flat) { monoRows.flat = flat; monoRows.notifyDataSetChanged() }
+        if (shown.isEmpty()) {
+            recyclerView.visibility = View.GONE
+            emptyStateTextView.visibility = View.VISIBLE
+            emptyStateTextView.text = if (q.isNotEmpty() && rawTransactions.isNotEmpty()) {
+                getString(R.string.list_empty_search, q)
+            } else when (filter) {
+                ListFilter.NEEDS_REVIEW -> getString(R.string.list_empty_needs_review)
+                ListFilter.REVIEWED -> getString(R.string.list_empty_reviewed)
+                ListFilter.MM_EXPORTED -> getString(R.string.list_empty_exported)
+                ListFilter.ALL -> getString(R.string.list_empty_all)
+            }
+            transactionAdapter.submitList(emptyList())
+            updateListSubtitle(0, filter)
+            renderMonoChrome(filter, emptyList())
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            emptyStateTextView.visibility = View.GONE
+            transactionAdapter.submitList(shown) {
+                if (scrollTop) recyclerView.scrollToPosition(0)
+            }
+            updateListSubtitle(shown.size, filter, q.isNotEmpty())
+            renderMonoChrome(filter, shown)
+        }
+        invalidateOptionsMenu()
+        if (selectionModeActive && (shown.isEmpty() || scrollTop)) exitSelectionMode()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -110,8 +228,8 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
                 filter == ListFilter.REVIEWED
             menu.findItem(R.id.action_delete_selected)?.isVisible = true
         } else {
-            menu.findItem(R.id.action_export_reviewed)?.isVisible =
-                filter == ListFilter.REVIEWED && lastListCount > 0
+            // Mono: the "Export N entries" pill (buttonListExport) is this action now.
+            menu.findItem(R.id.action_export_reviewed)?.isVisible = false
         }
         return super.onPrepareOptionsMenu(menu)
     }
@@ -174,6 +292,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             transactionListViewModel.setFilter(filter)
             transactionAdapter.setListFilter(filter)
+            rawTransactions = emptyList()
             invalidateOptionsMenu()
             if (selectionModeActive) {
                 exitSelectionMode()
@@ -190,51 +309,38 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     private fun setupRecyclerView() {
         transactionAdapter = TransactionAdapter(this)
-        recyclerView.adapter = transactionAdapter
+        monoRows = MonoRows(transactionAdapter)
+        recyclerView.adapter = monoRows
         recyclerView.layoutManager = LinearLayoutManager(this)
     }
 
     private fun observeViewModel() {
         transactionListViewModel.allTransactions.observe(this) { transactions ->
-            val filter = transactionListViewModel.currentFilter()
-            transactionAdapter.setListFilter(filter)
-            if (transactions.isNullOrEmpty()) {
-                recyclerView.visibility = View.GONE
-                emptyStateTextView.visibility = View.VISIBLE
-                emptyStateTextView.text = when (filter) {
-                    ListFilter.MM_EXPORTED -> getString(R.string.no_mm_exported)
-                    else -> getString(R.string.no_transactions_yet)
-                }
-                updateListSubtitle(0, filter)
-                invalidateOptionsMenu()
-                if (selectionModeActive) {
-                    exitSelectionMode()
-                }
-            } else {
-                recyclerView.visibility = View.VISIBLE
-                emptyStateTextView.visibility = View.GONE
-                transactionAdapter.submitList(transactions)
-                updateListSubtitle(transactions.size, filter)
-                invalidateOptionsMenu()
-            }
+            rawTransactions = transactions.orEmpty()
+            applyList()
         }
     }
 
-    private fun updateListSubtitle(count: Int, filter: ListFilter) {
+    private fun updateListSubtitle(count: Int, filter: ListFilter, searching: Boolean = false) {
         lastListCount = count
         if (selectionModeActive) return
-        supportActionBar?.subtitle = when {
+        val subtitle = findViewById<TextView>(R.id.textListSubtitle)
+        subtitle.text = when {
             count <= 0 -> null
+            searching -> resources.getQuantityString(R.plurals.list_count_items, count, count)
             filter == ListFilter.NEEDS_REVIEW -> getString(R.string.list_count_to_review, count)
             filter == ListFilter.REVIEWED -> getString(R.string.list_count_reviewed, count)
             filter == ListFilter.MM_EXPORTED -> getString(R.string.list_count_exported, count)
-            else -> getString(R.string.list_count_items, count)
+            else -> resources.getQuantityString(R.plurals.list_count_items, count, count)
         }
+        subtitle.isVisible = count > 0 && filter != ListFilter.REVIEWED
     }
 
     private fun startSelectionMode(initialId: Long? = null) {
         if (!selectionModeActive) {
             selectionModeActive = true
+            supportActionBar?.setDisplayShowTitleEnabled(true)
+            updateExportButton()
             invalidateOptionsMenu()
         }
         transactionAdapter.enterSelectionMode(initialId)
@@ -246,7 +352,9 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         selectionModeActive = false
         transactionAdapter.exitSelectionMode()
         supportActionBar?.title = getString(R.string.transactions)
-        updateListSubtitle(lastListCount, transactionListViewModel.currentFilter())
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        updateExportButton()
+        updateListSubtitle(lastListCount, transactionListViewModel.currentFilter(), query.isNotBlank())
         invalidateOptionsMenu()
     }
 
@@ -441,6 +549,166 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         }
     }
 
+    // ---- Mono presentation (look only; export/delete/selection logic above is unchanged) ----
+
+    private fun renderMonoChrome(filter: ListFilter, transactions: List<Transaction>) {
+        val sending = filter == ListFilter.REVIEWED
+        MonoNav.bind(this, if (sending) MonoNav.Tab.SEND else MonoNav.Tab.ALL)
+        findViewById<TextView>(R.id.textListTitle)
+            .setText(if (sending) R.string.list_send_title else R.string.transactions)
+        val showSend = sending && transactions.isNotEmpty()
+        findViewById<View>(R.id.listSendHeader).isVisible = showSend
+        exportButton.text = resources.getQuantityString(
+            R.plurals.list_export_entries, transactions.size, transactions.size
+        )
+        updateExportButton()
+        val dp = resources.displayMetrics.density
+        recyclerView.updatePadding(bottom = ((if (showSend) 176 else 112) * dp).toInt())
+        if (showSend) bindSendHeader(transactions)
+    }
+
+    private fun updateExportButton() {
+        exportButton.isVisible = transactionListViewModel.currentFilter() == ListFilter.REVIEWED &&
+            lastListCount > 0 && !selectionModeActive
+    }
+
+    /** M-Send summary, built from the exporter's own rows so it shows exactly what MM will get. */
+    private fun bindSendHeader(transactions: List<Transaction>) {
+        val config = ConfigStore(this).load()
+        val exportable = transactions.filter { MoneyManagerExporter.exportBlocker(it, config) == null }
+        val rows = exportable.flatMap { MoneyManagerExporter.expandTransaction(it, config) }
+        val duesLabel = "${config.debtCategory} / ${config.debtSubcategory}"
+
+        class Line(val dues: Boolean, var count: Int = 0, var amount: BigDecimal = BigDecimal.ZERO)
+        val lines = linkedMapOf<String, Line>()
+        var expenseTotal = BigDecimal.ZERO
+        var mine = BigDecimal.ZERO
+        rows.forEach { row ->
+            val amount = row.amount.toBigDecimalOrNull() ?: return@forEach
+            val expense = row.incomeExpense == "Expense"
+            // Friends' share rows: what expandTransaction writes to debtCategory/debtSubcategory for a split.
+            val dues = expense && !config.mmFullSplitAsOwnExpense &&
+                row.category == config.debtCategory && row.subcategory == config.debtSubcategory &&
+                row.note.contains("Split: ")
+            val name = when {
+                dues -> duesLabel
+                expense -> row.category
+                row.incomeExpense == "Income" -> "${row.category} · ${getString(R.string.list_send_income)}"
+                else -> "${row.category} · ${getString(R.string.list_send_transfer)}"
+            }
+            val line = lines.getOrPut(name) { Line(dues) }
+            line.count++
+            line.amount = line.amount.add(amount)
+            if (expense) expenseTotal = expenseTotal.add(amount)
+            if (expense && !dues) mine = mine.add(amount)
+        }
+
+        findViewById<TextView>(R.id.textListSendHero).text = Money.hero(expenseTotal)
+        findViewById<TextView>(R.id.textListSendCount).text =
+            resources.getQuantityString(R.plurals.list_entries, transactions.size, transactions.size)
+        val day = SimpleDateFormat("d MMM", Locale.getDefault())
+        val first = day.format(Date(transactions.minOf { it.timestamp }))
+        val last = day.format(Date(transactions.maxOf { it.timestamp }))
+        findViewById<TextView>(R.id.textListSendRange).text =
+            getString(R.string.list_send_range, if (first == last) first else "$first – $last")
+
+        val container = findViewById<LinearLayout>(R.id.containerListSendBreakdown)
+        container.removeAllViews()
+        val density = resources.displayMetrics.density
+        lines.entries.sortedWith(compareBy<Map.Entry<String, Line>> { it.value.dues }.thenByDescending { it.value.amount })
+            .forEach { (name, line) ->
+                val v = LayoutInflater.from(this).inflate(R.layout.item_list_breakdown, container, false)
+                if (line.dues) {
+                    v.findViewById<View>(R.id.viewListBreakdownDot).background = HatchDrawable(
+                        ContextCompat.getColor(this, R.color.mono_yellow),
+                        ContextCompat.getColor(this, R.color.mono_ink),
+                        density
+                    )
+                }
+                v.findViewById<TextView>(R.id.textListBreakdownName).text = name
+                val count = resources.getQuantityString(R.plurals.list_entries, line.count, line.count)
+                v.findViewById<TextView>(R.id.textListBreakdownMeta).text =
+                    if (line.dues) "$count · ${getString(R.string.list_send_dues_meta)}" else count
+                v.findViewById<TextView>(R.id.textListBreakdownAmount).text = rupees(line.amount)
+                container.addView(v)
+            }
+        findViewById<TextView>(R.id.textListSendMine).text = rupees(mine)
+
+        findViewById<TextView>(R.id.textListSendFullSplitTitle).setText(
+            if (config.mmFullSplitAsOwnExpense) R.string.list_send_full_on else R.string.list_send_full_off
+        )
+        findViewById<TextView>(R.id.textListSendFullSplit).text =
+            if (config.mmFullSplitAsOwnExpense) getString(R.string.list_send_full_on_hint)
+            else getString(R.string.list_send_full_off_hint, duesLabel)
+        findViewById<TextView>(R.id.textListSendFile).text = resources.getQuantityString(
+            R.plurals.list_send_file, rows.size, rows.size, MoneyManagerExporter.HEADERS.joinToString(", ")
+        )
+    }
+
+    /** Wraps the shared adapter (unchanged) and restyles each bound row in the Mono look. */
+    private class MonoRows(
+        private val inner: TransactionAdapter
+    ) : RecyclerView.Adapter<TransactionAdapter.TransactionViewHolder>() {
+
+        /** Amount/merchant sorts: no day headers (the shared adapter groups by day, which only makes sense by date). */
+        var flat = false
+
+        private val day = SimpleDateFormat("d MMM", Locale.getDefault())
+
+        init {
+            inner.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+                override fun onChanged() = notifyDataSetChanged()
+                override fun onItemRangeChanged(start: Int, count: Int) = notifyItemRangeChanged(start, count)
+                override fun onItemRangeChanged(start: Int, count: Int, payload: Any?) =
+                    notifyItemRangeChanged(start, count, payload)
+                override fun onItemRangeInserted(start: Int, count: Int) = notifyItemRangeInserted(start, count)
+                override fun onItemRangeRemoved(start: Int, count: Int) = notifyItemRangeRemoved(start, count)
+                override fun onItemRangeMoved(from: Int, to: Int, count: Int) = notifyItemMoved(from, to)
+            })
+        }
+
+        override fun getItemCount() = inner.itemCount
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            inner.onCreateViewHolder(parent, viewType)
+
+        override fun onBindViewHolder(holder: TransactionAdapter.TransactionViewHolder, position: Int) {
+            inner.onBindViewHolder(holder, position)
+            if (flat) holder.itemView.findViewById<View>(R.id.textViewGroupDate).visibility = View.GONE
+            style(holder.itemView, inner.currentList[position])
+        }
+
+        private fun style(view: View, tx: Transaction) {
+            val context = view.context
+            view.findViewById<TextView>(R.id.textListMonogram).text =
+                tx.merchantName.trim().take(1).uppercase().ifEmpty { "?" }
+            view.findViewById<TextView>(R.id.textViewAmount).text = rupees(BigDecimal.valueOf(tx.amount))
+
+            val type = MoneyManagerExporter.normalizeType(tx.transactionType)
+            view.findViewById<TextView>(R.id.textViewCategory).text = listOfNotNull(
+                type.takeIf { it != "Expense" },
+                tx.account.ifBlank { null },
+                tx.category.ifBlank { null }?.let { c -> if (tx.subcategory.isBlank()) c else "$c / ${tx.subcategory}" },
+                day.format(Date(tx.timestamp))
+            ).joinToString(" · ")
+
+            val status = view.findViewById<TextView>(R.id.textViewStatus)
+            if (status.isVisible) {
+                val (text, bg, fg) = when (tx.reviewStatus) {
+                    ReviewStatus.NEEDS_REVIEW ->
+                        Triple(R.string.list_status_needs_review, R.drawable.bg_mono_pill_outline, R.color.mono_ink)
+                    ReviewStatus.REVIEWED ->
+                        Triple(R.string.list_status_reviewed, R.drawable.bg_mono_pill_yellow, R.color.mono_on_yellow)
+                    else ->
+                        Triple(R.string.list_status_exported, R.drawable.list_bg_tag_grey, R.color.mono_ink)
+                }
+                status.setText(text)
+                status.setBackgroundResource(bg)
+                status.setTextColor(ContextCompat.getColor(context, fg))
+            }
+        }
+    }
+
     override fun onSupportNavigateUp(): Boolean {
         if (selectionModeActive) {
             exitSelectionMode()
@@ -452,5 +720,19 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     companion object {
         const val EXTRA_FILTER = "extra_list_filter"
+
+        private val SORT_LABELS = listOf(
+            TransactionSort.NEWEST to R.string.list_sort_newest,
+            TransactionSort.OLDEST to R.string.list_sort_oldest,
+            TransactionSort.AMOUNT_HIGH to R.string.list_sort_amount_high,
+            TransactionSort.AMOUNT_LOW to R.string.list_sort_amount_low,
+            TransactionSort.MERCHANT to R.string.list_sort_merchant
+        )
+
+        /** Money.format with paise only when they exist, ₹ shrunk onto the baseline. */
+        private fun rupees(amount: BigDecimal): CharSequence {
+            val text = Money.format(amount, withPaise = amount.stripTrailingZeros().scale() > 0)
+            return Money.styled(text, 0.72f)
+        }
     }
 }

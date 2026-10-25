@@ -15,17 +15,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paymentsmstracker.agent.AgentChatViewModel
+import com.example.paymentsmstracker.agent.AgentProvider
 import com.example.paymentsmstracker.agent.AgentSettings
 import com.example.paymentsmstracker.agent.CardState
 import com.example.paymentsmstracker.agent.ChatItem
 import com.example.paymentsmstracker.data.ReviewStatus
-import com.google.android.material.appbar.MaterialToolbar
+import com.example.paymentsmstracker.home.Money
+import com.example.paymentsmstracker.ui.MonoNav
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
-import com.google.android.material.color.MaterialColors
-import java.text.NumberFormat
+import androidx.core.content.ContextCompat
+import com.google.android.material.shape.ShapeAppearanceModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,13 +39,23 @@ class AgentChatActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_agent_chat)
-        findViewById<MaterialToolbar>(R.id.toolbarAgentChat).setNavigationOnClickListener { finish() }
+        MonoNav.bind(this, MonoNav.Tab.ASK)
+        val settings = AgentSettings(this)
+        bindHeader(settings)
         viewModel.seedTransactionId = intent.getLongExtra(EXTRA_TRANSACTION_ID, 0L)
 
         val recycler = findViewById<RecyclerView>(R.id.recyclerAgentChat)
         val adapter = ChatAdapter(viewModel)
         recycler.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
         recycler.adapter = adapter
+        // Keep the last message clear of the pinned composer (its height changes with Apply all).
+        findViewById<View>(R.id.agentComposer).addOnLayoutChangeListener { v, _, top, _, _, _, _, _, _ ->
+            val root = v.parent as View
+            val pad = root.height - root.paddingBottom - top + (16 * resources.displayMetrics.density).toInt()
+            if (recycler.paddingBottom != pad) recycler.post {
+                recycler.setPadding(recycler.paddingLeft, recycler.paddingTop, recycler.paddingRight, pad)
+            }
+        }
 
         val input = findViewById<EditText>(R.id.editAgentInput)
         val send = findViewById<MaterialButton>(R.id.buttonAgentSend)
@@ -51,7 +63,7 @@ class AgentChatActivity : AppCompatActivity() {
         val applyAll = findViewById<MaterialButton>(R.id.buttonAgentApplyAll)
         val chips = findViewById<ChipGroup>(R.id.chipGroupAgentExamples)
 
-        if (!AgentSettings(this).isReady) {
+        if (!settings.isReady) {
             findViewById<TextView>(R.id.textAgentEmpty).setText(R.string.agent_chat_not_ready)
             input.isEnabled = false
             send.isEnabled = false
@@ -61,6 +73,7 @@ class AgentChatActivity : AppCompatActivity() {
         resources.getStringArray(R.array.agent_chat_examples).forEach { example ->
             chips.addView(Chip(this).apply {
                 text = example
+                isCheckable = false
                 setOnClickListener { input.setText(example); input.setSelection(example.length) }
             })
         }
@@ -105,6 +118,42 @@ class AgentChatActivity : AppCompatActivity() {
         }
     }
 
+    /** Provider tag ("Your key · Claude") and what the model may read, from AgentSettings. */
+    private fun bindHeader(settings: AgentSettings) {
+        val provider = settings.provider
+        val name = getString(
+            when (provider) {
+                AgentProvider.CLAUDE -> R.string.ai_provider_claude
+                AgentProvider.OPENROUTER -> R.string.ai_provider_openrouter
+                AgentProvider.OPENAI_COMPATIBLE -> R.string.ai_provider_openai
+            }
+        )
+        findViewById<TextView>(R.id.textAgentProvider).text = when {
+            !settings.enabled -> getString(R.string.agent_mono_off)
+            settings.apiKey(provider).isNotBlank() -> getString(R.string.agent_mono_your_key, name)
+            else -> name
+        }
+        val p = settings.privacy
+        val fields = listOf(
+            p.amounts to R.string.ai_read_amounts,
+            p.merchants to R.string.ai_read_merchants,
+            p.dates to R.string.ai_read_dates,
+            p.categories to R.string.ai_read_categories,
+            p.notes to R.string.ai_read_notes,
+            p.friends to R.string.ai_read_friends,
+            p.merchantMemory to R.string.ai_read_merchant_memory,
+            p.history to R.string.ai_read_history,
+            p.sms to R.string.ai_read_sms,
+            p.location to R.string.ai_read_location
+        ).filter { it.first }.map { getString(it.second).lowercase(Locale.getDefault()) }
+        val reads = if (fields.isEmpty()) getString(R.string.agent_mono_reads_nothing)
+        else getString(
+            R.string.agent_mono_reads,
+            if (fields.size == 1) fields[0] else fields.dropLast(1).joinToString(", ") + " " + getString(R.string.agent_mono_and) + " " + fields.last()
+        )
+        findViewById<TextView>(R.id.textAgentReads).text = "$reads ${getString(R.string.agent_mono_never_sent)}"
+    }
+
     private class ChatAdapter(private val vm: AgentChatViewModel) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         private var items: List<ChatItem> = emptyList()
 
@@ -128,24 +177,36 @@ class AgentChatActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             when (val item = items[position]) {
-                is ChatItem.UserText -> bindMessage(holder.itemView, item.text, Gravity.END,
-                    com.google.android.material.R.attr.colorPrimaryContainer)
-                is ChatItem.AssistantText -> bindMessage(holder.itemView, item.text, Gravity.START,
-                    com.google.android.material.R.attr.colorSurfaceVariant, reportable = true)
-                is ChatItem.Error -> bindMessage(holder.itemView, item.text, Gravity.START,
-                    com.google.android.material.R.attr.colorErrorContainer)
+                is ChatItem.UserText -> bindMessage(holder.itemView, item.text, user = true, textColor = R.color.mono_on_ink)
+                is ChatItem.AssistantText -> bindMessage(holder.itemView, item.text, user = false, textColor = R.color.mono_ink, reportable = true)
+                is ChatItem.Error -> bindMessage(holder.itemView, item.text, user = false, textColor = R.color.mono_error)
                 is ChatItem.Card -> bindCard(holder.itemView, item)
             }
         }
 
-        private fun bindMessage(view: View, text: String, gravity: Int, colorAttr: Int, reportable: Boolean = false) {
+        /** User: ink bubble on the right with a tucked corner. Assistant/error: full-width white card. */
+        private fun bindMessage(view: View, text: String, user: Boolean, textColor: Int, reportable: Boolean = false) {
+            val reply = text
+            val ctx = view.context
+            val d = ctx.resources.displayMetrics.density
             val card = view.findViewById<MaterialCardView>(R.id.cardAgentMessage)
-            (card.layoutParams as FrameLayout.LayoutParams).gravity = gravity
-            card.setCardBackgroundColor(MaterialColors.getColor(card, colorAttr))
-            view.findViewById<TextView>(R.id.textAgentMessage).text = text
+            (card.layoutParams as FrameLayout.LayoutParams).apply {
+                gravity = if (user) Gravity.END else Gravity.START
+                width = if (user) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT
+                marginStart = if (user) (48 * d).toInt() else 0
+            }
+            card.setCardBackgroundColor(ContextCompat.getColor(ctx, if (user) R.color.mono_ink else R.color.mono_surface))
+            card.shapeAppearanceModel = ShapeAppearanceModel.builder()
+                .setAllCornerSizes((if (user) 22 else 20) * d)
+                .apply { if (user) setBottomRightCornerSize(6 * d) }
+                .build()
+            view.findViewById<TextView>(R.id.textAgentMessage).apply {
+                this.text = text
+                setTextColor(ContextCompat.getColor(ctx, textColor))
+            }
             view.findViewById<MaterialButton>(R.id.buttonReportResponse).apply {
                 visibility = if (reportable) View.VISIBLE else View.GONE
-                setOnClickListener { Disclosures.reportResponse(context, text) }
+                setOnClickListener { Disclosures.reportResponse(ctx, reply) }
             }
         }
 
@@ -153,11 +214,16 @@ class AgentChatActivity : AppCompatActivity() {
             val p = card.proposal
             val s = p.suggestion
             val ctx = view.context
-            view.findViewById<TextView>(R.id.textProposalHeader).text = listOf(
-                p.tx.merchantName,
-                NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(p.tx.amount),
-                SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(p.tx.timestamp))
-            ).joinToString(" · ")
+            val merchant = p.tx.merchantName.ifBlank { "Payment" }
+            view.findViewById<TextView>(R.id.textProposalMonogram).text = merchant.take(1).uppercase()
+            view.findViewById<TextView>(R.id.textProposalHeader).text = merchant
+            view.findViewById<TextView>(R.id.textProposalMeta).text = listOf(
+                SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.getDefault()).format(Date(p.tx.timestamp)),
+                p.tx.account
+            ).filter { it.isNotBlank() }.joinToString(" · ")
+            view.findViewById<TextView>(R.id.textProposalAmount).text = Money.styled(
+                Money.format(java.math.BigDecimal.valueOf(p.tx.amount), withPaise = p.tx.amount % 1.0 != 0.0)
+            )
             view.findViewById<TextView>(R.id.textProposalDiff).text = buildList {
                 s.diff().forEach { (label, before, after) -> add("$label: $before → $after") }
                 if (p.markReviewed && p.tx.reviewStatus == ReviewStatus.NEEDS_REVIEW) add(ctx.getString(R.string.agent_chat_mark_reviewed))
@@ -172,7 +238,7 @@ class AgentChatActivity : AppCompatActivity() {
                 )).takeIf { it.isNotEmpty() }?.joinToString("\n") { "⚠ $it" }
             )
             view.findViewById<TextView>(R.id.textProposalReason).showText(s.reason.ifBlank { null })
-            view.findViewById<TextView>(R.id.textProposalState).text = listOfNotNull(
+            view.findViewById<TextView>(R.id.textProposalState).showText(listOfNotNull(
                 when (card.state) {
                     CardState.APPLIED -> ctx.getString(R.string.agent_chat_applied)
                     CardState.SKIPPED -> ctx.getString(R.string.agent_chat_skipped)
@@ -180,7 +246,7 @@ class AgentChatActivity : AppCompatActivity() {
                     CardState.PENDING -> null
                 },
                 card.message
-            ).joinToString(": ")
+            ).joinToString(": ").ifBlank { null })
 
             val pending = card.state == CardState.PENDING
             view.findViewById<MaterialButton>(R.id.buttonProposalSkip).apply {
@@ -195,7 +261,7 @@ class AgentChatActivity : AppCompatActivity() {
         }
 
         private fun TextView.showText(value: String?) {
-            text = value
+            text = value?.let { Money.styled(it) }
             visibility = if (value == null) View.GONE else View.VISIBLE
         }
 

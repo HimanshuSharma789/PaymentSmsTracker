@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sheet · PC Manager</title>
   <link rel="stylesheet" href="/style.css" />
+  <script src="/theme.js"></script>
 </head>
 <body>
   <div id="app" class="wide">
     <section id="loginView" class="panel">
-      <h1>PC Manager</h1>
+      <h1>PC <mark>Manager</mark></h1>
       <p class="muted">Enter the 6-digit code from Admin → PC Manager.</p>
       <label>Access code
-        <input id="codeInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+        <input id="codeInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="······" />
       </label>
       <button id="loginBtn" class="primary">Continue</button>
       <p id="loginError" class="error" hidden></p>
@@ -31,13 +32,19 @@
         </div>
       </header>
 
+      <div class="stats" aria-label="Summary">
+        <span class="stat yellow"><b id="stReview">0</b> To review</span>
+        <span class="stat"><b id="stReviewed">0</b> Reviewed</span>
+        <span class="stat"><b id="stShown">0</b> Total shown</span>
+      </div>
+
       <div class="filters">
-        <button data-status="needs_review" class="chip active">Needs review</button>
+        <button data-status="needs_review" class="chip active">To review</button>
         <button data-status="reviewed" class="chip">Reviewed</button>
         <button data-status="" class="chip">All</button>
       </div>
       <div class="filterRow">
-        <input id="searchInput" type="search" placeholder="Search merchant, notes, amount, SMS…" />
+        <div class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="searchInput" type="search" aria-label="Search" placeholder="Search merchant, amount, SMS…" title="Search merchant, notes, amount, SMS" /></div>
         <select id="filterAccount" aria-label="Account">
           <option value="">All accounts</option>
         </select>

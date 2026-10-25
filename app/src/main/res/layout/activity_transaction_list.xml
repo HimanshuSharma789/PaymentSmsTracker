@@ -1,97 +1,241 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Mono list. With the Reviewed filter it doubles as "Send to Money Manager" (M-Send). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/mono_bg"
     android:fitsSystemWindows="true"
     tools:context=".TransactionListActivity">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appBarLayout"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbarTransactionList"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorSurface"
+            app:navigationContentDescription="@string/list_back"
             app:navigationIcon="@drawable/outline_arrow_back_24"
-            app:title="@string/transactions" />
+            app:navigationIconTint="?attr/colorOnSurface" />
 
-        <HorizontalScrollView
+        <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="none">
+            android:layout_height="match_parent">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chipGroupFilter"
-                android:layout_width="wrap_content"
+            <com.google.android.material.appbar.AppBarLayout
+                android:id="@+id/appBarLayout"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingBottom="8dp"
-                app:selectionRequired="false"
-                app:singleSelection="true">
+                android:background="@color/mono_bg"
+                app:elevation="0dp"
+                app:liftOnScroll="false">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipNeedsReview"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="@string/filter_needs_review" />
+                    android:orientation="vertical"
+                    app:layout_scrollFlags="scroll|enterAlways">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipReviewed"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/filter_reviewed" />
+                    <TextView
+                        android:id="@+id/textListTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        android:accessibilityHeading="true"
+                        android:text="@string/transactions"
+                        android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                        tools:ignore="UnusedAttribute" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipMmExported"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/filter_mm_exported" />
+                    <TextView
+                        android:id="@+id/textListSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone"
+                        tools:text="12 to review"
+                        tools:visibility="visible" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipAll"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/filter_all" />
-            </com.google.android.material.chip.ChipGroup>
-        </HorizontalScrollView>
+                    <LinearLayout
+                        android:id="@+id/rowListSearch"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        android:layout_marginTop="14dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-    </com.google.android.material.appbar.AppBarLayout>
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_mono_search"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-    <FrameLayout
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_marginStart="14dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_mono_search" />
+
+                            <EditText
+                                android:id="@+id/editListSearch"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:background="@null"
+                                android:hint="@string/list_search_hint"
+                                android:imeOptions="actionSearch"
+                                android:importantForAutofill="no"
+                                android:inputType="text"
+                                android:maxLines="1"
+                                android:paddingHorizontal="10dp"
+                                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                            <ImageButton
+                                android:id="@+id/buttonListSearchClear"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@null"
+                                android:contentDescription="@string/list_search_clear"
+                                android:src="@drawable/ic_mono_close"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="8dp">
+
+                            <ImageButton
+                                android:id="@+id/buttonListSort"
+                                style="@style/Widget.Mono.IconButton"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:contentDescription="@string/list_sort"
+                                android:src="@drawable/ic_mono_sort" />
+
+                            <View
+                                android:id="@+id/dotListSort"
+                                android:layout_width="10dp"
+                                android:layout_height="10dp"
+                                android:layout_gravity="top|end"
+                                android:layout_margin="2dp"
+                                android:background="@drawable/bg_mono_circle_yellow"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:clipToPadding="false"
+                        android:paddingHorizontal="20dp"
+                        android:scrollbars="none">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/chipGroupFilter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:chipSpacingHorizontal="8dp"
+                            app:selectionRequired="false"
+                            app:singleLine="true"
+                            app:singleSelection="true">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipNeedsReview"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/filter_needs_review"
+                                app:checkedIconVisible="false" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipReviewed"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/filter_reviewed"
+                                app:checkedIconVisible="false" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipMmExported"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/filter_mm_exported"
+                                app:checkedIconVisible="false" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipAll"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/filter_all"
+                                app:checkedIconVisible="false" />
+                        </com.google.android.material.chip.ChipGroup>
+                    </HorizontalScrollView>
+
+                    <include
+                        android:id="@+id/listSendHeader"
+                        layout="@layout/list_send_header"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+            </com.google.android.material.appbar.AppBarLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewTransactions"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="112dp"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                app:layout_behavior="@string/appbar_scrolling_view_behavior"
+                tools:listitem="@layout/item_transaction" />
+        </androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/textViewEmptyState"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingHorizontal="8dp"
-        android:paddingTop="4dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:paddingHorizontal="40dp"
+        android:text="@string/no_transactions_yet"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerViewTransactions"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            tools:listitem="@layout/item_transaction" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonListExport"
+        style="@style/Widget.Mono.Button.Yellow"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="100dp"
+        android:elevation="6dp"
+        android:textSize="16sp"
+        android:visibility="gone"
+        app:icon="@drawable/ic_mono_send"
+        app:iconGravity="textEnd"
+        app:iconSize="18dp"
+        tools:text="Export 11 entries"
+        tools:visibility="visible" />
 
-        <TextView
-            android:id="@+id/textViewEmptyState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/no_transactions_yet"
-            android:textAppearance="?attr/textAppearanceBodyLarge"
-            android:visibility="gone"
-            tools:visibility="visible" />
-    </FrameLayout>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+    <include layout="@layout/view_mono_nav" />
+</FrameLayout>

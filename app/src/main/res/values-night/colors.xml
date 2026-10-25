@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mono_bg">#141412</color>
+    <color name="mono_surface">#1F1F1C</color>
+    <color name="mono_ink">#F2F0EA</color>
+    <color name="mono_on_ink">#141412</color>
+    <color name="mono_meta">#A9A79F</color>
+    <color name="mono_line">#34332F</color>
+    <color name="mono_surface_soft">#8C1F1F1C</color>
+    <color name="mono_error">#F97066</color>
+    <color name="transaction_income">#4ADE80</color>
+    <color name="transaction_transfer">#60A5FA</color>
+    <color name="split_status_pending_bg">#3A2E0F</color>
+    <color name="split_status_pending_fg">#FBBF24</color>
+    <color name="split_status_pushed_bg">#12301D</color>
+    <color name="split_status_pushed_fg">#4ADE80</color>
+    <color name="split_status_failed_bg">#3B1818</color>
+    <color name="split_status_failed_fg">#F87171</color>
+</resources>

@@ -4,9 +4,10 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
+import android.view.LayoutInflater
 import android.view.View
+import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -16,31 +17,50 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.paymentsmstracker.data.AppDatabase
 import com.example.paymentsmstracker.data.ReviewStatus
+import com.example.paymentsmstracker.data.Transaction
+import com.example.paymentsmstracker.home.HomeSummary
+import com.example.paymentsmstracker.home.HomeSummaryCalculator
+import com.example.paymentsmstracker.home.Money
+import com.example.paymentsmstracker.home.QuickReview
+import com.example.paymentsmstracker.merchant.MerchantMemory
+import com.example.paymentsmstracker.ui.HatchDrawable
+import com.example.paymentsmstracker.ui.MonoNav
+import com.example.paymentsmstracker.ui.WeekBarsView
 import com.example.paymentsmstracker.viewmodel.ListFilter
-import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.snackbar.Snackbar
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+/** Mono home: month spend, last 7 days, the review queue with one-tap confirm, and what's ready to send. */
 class MainActivity : AppCompatActivity() {
 
-    private enum class HomePrimaryAction {
-        REVIEW,
-        EXPORT_MM,
-        SPLITS,
-        ADD
-    }
+    private val db by lazy { AppDatabase.getDatabase(applicationContext) }
 
-    private lateinit var textHomeSummary: TextView
-    private lateinit var textHomeReviewCount: TextView
-    private lateinit var textHomeReadyCount: TextView
-    private lateinit var textHomeSplitsCount: TextView
-    private lateinit var buttonHomePrimary: MaterialButton
+    private lateinit var textHero: TextView
+    private lateinit var textSpentLabel: TextView
+    private lateinit var textDelta: TextView
+    private lateinit var textWeekTotal: TextView
+    private lateinit var weekBars: WeekBarsView
+    private lateinit var textLeft: TextView
+    private lateinit var textReviewHint: TextView
+    private lateinit var containerReview: LinearLayout
+    private lateinit var textReviewEmpty: TextView
+    private lateinit var buttonSeeAll: MaterialButton
+    private lateinit var textReadyTotal: TextView
+    private lateinit var textReadySub: TextView
+    private lateinit var buttonSend: MaterialButton
+    private lateinit var textSplitsSub: TextView
 
-    private var primaryAction = HomePrimaryAction.ADD
-    private var needsReviewCount = 0
-    private var readyForMmCount = 0
-    private var pendingSplitsCount = 0
+    /** Ids being confirmed right now, so a fast double tap or a re-render can't confirm twice. */
+    private val confirming = mutableSetOf<Long>()
 
     /** Core permissions (SMS + notifications) are asked once on a clean install; after that only from Settings → Permissions. */
     private val startupPermissionsLauncher =
@@ -50,36 +70,37 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val toolbar: MaterialToolbar = findViewById(R.id.toolbarHome)
-        setSupportActionBar(toolbar)
+        textHero = findViewById(R.id.textHomeHero)
+        textSpentLabel = findViewById(R.id.textHomeSpentLabel)
+        textDelta = findViewById(R.id.textHomeDelta)
+        textWeekTotal = findViewById(R.id.textHomeWeekTotal)
+        weekBars = findViewById(R.id.weekBars)
+        textLeft = findViewById(R.id.textHomeLeft)
+        textReviewHint = findViewById(R.id.textHomeReviewHint)
+        containerReview = findViewById(R.id.containerHomeReview)
+        textReviewEmpty = findViewById(R.id.textHomeReviewEmpty)
+        buttonSeeAll = findViewById(R.id.buttonHomeSeeAll)
+        textReadyTotal = findViewById(R.id.textHomeReadyTotal)
+        textReadySub = findViewById(R.id.textHomeReadySub)
+        buttonSend = findViewById(R.id.buttonHomeSend)
+        textSplitsSub = findViewById(R.id.textHomeSplitsSub)
 
-        textHomeSummary = findViewById(R.id.textHomeSummary)
-        textHomeReviewCount = findViewById(R.id.textHomeReviewCount)
-        textHomeReadyCount = findViewById(R.id.textHomeReadyCount)
-        textHomeSplitsCount = findViewById(R.id.textHomeSplitsCount)
-        buttonHomePrimary = findViewById(R.id.buttonHomePrimary)
-
-        findViewById<View>(R.id.rowHomeReview).setOnClickListener {
-            openTransactionList(ListFilter.NEEDS_REVIEW)
-        }
-        findViewById<View>(R.id.rowHomeReadyMm).setOnClickListener {
-            openTransactionList(ListFilter.REVIEWED)
-        }
-        findViewById<View>(R.id.rowHomeSplits).setOnClickListener {
-            startActivity(Intent(this, SplitsActivity::class.java))
-        }
-        buttonHomePrimary.setOnClickListener { runPrimaryAction() }
-        findViewById<MaterialButton>(R.id.button_go_to_transaction).setOnClickListener {
+        findViewById<TextView>(R.id.textHomeDate).text =
+            LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
+        findViewById<ImageButton>(R.id.buttonHomeAdd).setOnClickListener {
             startActivity(Intent(this, TransactionEntryActivity::class.java))
         }
-        findViewById<MaterialButton>(R.id.button_view_all_transactions).setOnClickListener {
-            openTransactionList(ListFilter.ALL)
+        findViewById<ImageButton>(R.id.buttonHomeSettings).setOnClickListener {
+            startActivity(Intent(this, AdminActivity::class.java))
         }
-        findViewById<MaterialButton>(R.id.buttonHomeAgentChat).setOnClickListener {
-            startActivity(Intent(this, AgentChatActivity::class.java))
+        buttonSeeAll.setOnClickListener { openList(ListFilter.NEEDS_REVIEW) }
+        buttonSend.setOnClickListener { openList(ListFilter.REVIEWED) }
+        findViewById<MaterialCardView>(R.id.cardHomeSplits).setOnClickListener {
+            startActivity(Intent(this, SplitsActivity::class.java))
         }
+        MonoNav.bind(this, MonoNav.Tab.HOME)
 
-        observeHomeCounts()
+        observeHome()
         askStartupPermissionsOnce()
     }
 
@@ -99,104 +120,165 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun observeHomeCounts() {
-        val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
+    private fun observeHome() {
+        val dao = db.transactionDao()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                combine(
-                    dao.countByStatus(ReviewStatus.NEEDS_REVIEW),
-                    dao.countByStatus(ReviewStatus.REVIEWED),
-                    dao.countPendingSplits()
-                ) { review, ready, splits ->
-                    Triple(review, ready, splits)
-                }.collect { (review, ready, splits) ->
-                    needsReviewCount = review
-                    readyForMmCount = ready
-                    pendingSplitsCount = splits
-                    renderHomeCounts()
+                combine(dao.getAllTransactions(), dao.countPendingSplits()) { all, splits ->
+                    val summary = withContext(Dispatchers.Default) {
+                        HomeSummaryCalculator.summarize(all, LocalDate.now())
+                    }
+                    Triple(summary, all.filter { it.reviewStatus == ReviewStatus.NEEDS_REVIEW }, splits)
+                }.collect { (summary, toReview, splits) ->
+                    renderSummary(summary)
+                    renderReview(toReview)
+                    textSplitsSub.text = if (splits > 0) {
+                        getString(R.string.mono_splits_sub, splits)
+                    } else {
+                        getString(R.string.mono_splits_none)
+                    }
                 }
             }
         }
     }
 
-    private fun renderHomeCounts() {
-        textHomeReviewCount.text = needsReviewCount.toString()
-        textHomeReadyCount.text = readyForMmCount.toString()
-        textHomeSplitsCount.text = pendingSplitsCount.toString()
+    private fun renderSummary(s: HomeSummary) {
+        val today = LocalDate.now()
+        val month = today.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        val lastMonth = today.minusMonths(1).month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        textSpentLabel.text = getString(R.string.mono_spent_in, month)
+        textHero.text = Money.hero(s.monthSpent)
 
-        val totalLeft = needsReviewCount + readyForMmCount + pendingSplitsCount
-        textHomeSummary.text = if (totalLeft == 0) {
-            getString(R.string.home_summary_caught_up)
+        val diff = s.monthSpent.subtract(s.lastMonthToDate)
+        if (s.lastMonthToDate.signum() == 0) {
+            textDelta.visibility = View.GONE
         } else {
-            getString(
-                R.string.home_summary,
-                needsReviewCount,
-                readyForMmCount,
-                pendingSplitsCount
+            textDelta.visibility = View.VISIBLE
+            textDelta.text = when (diff.signum()) {
+                -1 -> getString(R.string.mono_vs_last_less, Money.format(diff.abs()), lastMonth).let { Money.styled(it) }
+                1 -> getString(R.string.mono_vs_last_more, Money.format(diff), lastMonth).let { Money.styled(it) }
+                else -> getString(R.string.mono_vs_last_same, lastMonth)
+            }
+            textDelta.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                when (diff.signum()) {
+                    -1 -> R.drawable.ic_mono_arrow_down
+                    1 -> R.drawable.ic_mono_arrow_up
+                    else -> 0
+                }, 0, 0, 0
             )
         }
 
-        primaryAction = when {
-            needsReviewCount > 0 -> HomePrimaryAction.REVIEW
-            readyForMmCount > 0 -> HomePrimaryAction.EXPORT_MM
-            pendingSplitsCount > 0 -> HomePrimaryAction.SPLITS
-            else -> HomePrimaryAction.ADD
+        weekBars.setDays(s.lastSevenDays)
+        val weekTotal = s.lastSevenDays.fold(java.math.BigDecimal.ZERO) { acc, d -> acc + d.amount }
+        textWeekTotal.text = Money.styled(getString(R.string.mono_week_total, Money.format(weekTotal)))
+
+        textReadyTotal.text = Money.hero(s.readyTotal, 0.6f)
+        textReadySub.text = if (s.readyCount > 0) {
+            getString(R.string.mono_ready_sub, s.readyCount)
+        } else {
+            getString(R.string.mono_ready_none)
         }
-        when (primaryAction) {
-            HomePrimaryAction.REVIEW -> {
-                buttonHomePrimary.setText(R.string.home_cta_review)
-                buttonHomePrimary.setIconResource(R.drawable.baseline_history_24)
-            }
-            HomePrimaryAction.EXPORT_MM -> {
-                buttonHomePrimary.setText(R.string.home_cta_export)
-                buttonHomePrimary.setIconResource(R.drawable.outline_task_alt_24)
-            }
-            HomePrimaryAction.SPLITS -> {
-                buttonHomePrimary.setText(R.string.home_cta_splits)
-                buttonHomePrimary.setIconResource(R.drawable.outline_checklist_24)
-            }
-            HomePrimaryAction.ADD -> {
-                buttonHomePrimary.setText(R.string.home_cta_caught_up)
-                buttonHomePrimary.setIconResource(R.drawable.outline_attach_money_24)
-            }
+        buttonSend.isEnabled = s.readyCount > 0
+    }
+
+    private fun renderReview(toReview: List<Transaction>) {
+        textLeft.text = getString(R.string.mono_left, toReview.size)
+        textLeft.visibility = if (toReview.isEmpty()) View.GONE else View.VISIBLE
+        textReviewHint.visibility = if (toReview.any { QuickReview.canConfirm(it) }) View.VISIBLE else View.GONE
+        textReviewEmpty.visibility = if (toReview.isEmpty()) View.VISIBLE else View.GONE
+
+        containerReview.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        toReview.take(MAX_ROWS).forEach { tx -> containerReview.addView(reviewRow(inflater, tx)) }
+
+        if (toReview.size > MAX_ROWS) {
+            buttonSeeAll.visibility = View.VISIBLE
+            buttonSeeAll.text = getString(R.string.mono_see_all_review, toReview.size)
+        } else {
+            buttonSeeAll.visibility = View.GONE
         }
     }
 
-    private fun runPrimaryAction() {
-        when (primaryAction) {
-            HomePrimaryAction.REVIEW -> openTransactionList(ListFilter.NEEDS_REVIEW)
-            HomePrimaryAction.EXPORT_MM -> openTransactionList(ListFilter.REVIEWED)
-            HomePrimaryAction.SPLITS -> startActivity(Intent(this, SplitsActivity::class.java))
-            HomePrimaryAction.ADD ->
-                startActivity(Intent(this, TransactionEntryActivity::class.java))
+    private fun reviewRow(inflater: LayoutInflater, tx: Transaction): View {
+        val row = inflater.inflate(R.layout.item_home_review, containerReview, false)
+        val merchant = tx.merchantName.ifBlank { "Payment" }
+        row.findViewById<TextView>(R.id.textReviewMonogram).text = merchant.take(1).uppercase()
+        row.findViewById<TextView>(R.id.textReviewMerchant).text = merchant
+        val category = listOf(tx.category, tx.subcategory).filter { it.isNotBlank() }.joinToString(" / ")
+        row.findViewById<TextView>(R.id.textReviewMeta).text =
+            listOf(tx.account, category.ifBlank { "No guess yet" }).filter { it.isNotBlank() }.joinToString(" · ")
+        row.findViewById<TextView>(R.id.textReviewAmount).text = Money.styled(Money.format(tx.amount))
+        row.setOnClickListener { openEntry(tx.id) }
+
+        val confirm = row.findViewById<ImageButton>(R.id.buttonReviewConfirm)
+        val choose = row.findViewById<MaterialButton>(R.id.buttonReviewChoose)
+        if (QuickReview.canConfirm(tx)) {
+            confirm.background = HatchDrawable(
+                ContextCompat.getColor(this, R.color.mono_surface),
+                ContextCompat.getColor(this, R.color.mono_meta),
+                resources.displayMetrics.density
+            )
+            confirm.imageTintList = ContextCompat.getColorStateList(this, R.color.mono_ink)
+            confirm.contentDescription = getString(R.string.mono_confirm_guess, merchant, category)
+            confirm.isEnabled = tx.id !in confirming
+            confirm.setOnClickListener {
+                confirm.isEnabled = false
+                confirm.setBackgroundResource(R.drawable.bg_mono_circle_ink)
+                confirm.imageTintList = ContextCompat.getColorStateList(this, R.color.mono_yellow)
+                quickConfirm(tx)
+            }
+        } else {
+            confirm.visibility = View.GONE
+            choose.visibility = View.VISIBLE
+            choose.setOnClickListener { openEntry(tx.id) }
+        }
+        return row
+    }
+
+    private fun quickConfirm(tx: Transaction) {
+        if (!confirming.add(tx.id)) return
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    db.transactionDao().updateTransaction(QuickReview.confirmed(tx, System.currentTimeMillis()))
+                    MerchantMemory.remember(
+                        db = db,
+                        merchant = tx.merchantName,
+                        category = tx.category,
+                        subcategory = tx.subcategory,
+                        account = tx.account,
+                        transactionType = tx.transactionType
+                    )
+                }
+            } finally {
+                confirming.remove(tx.id)
+            }
+            Snackbar.make(containerReview, getString(R.string.mono_confirmed, tx.merchantName), Snackbar.LENGTH_LONG)
+                .setAnchorView(R.id.monoNav)
+                .setAction(R.string.mono_undo) {
+                    lifecycleScope.launch(Dispatchers.IO) { db.transactionDao().updateTransaction(tx) }
+                }
+                .show()
         }
     }
 
-    private fun openTransactionList(filter: ListFilter) {
+    private fun openEntry(id: Long) {
         startActivity(
-            Intent(this, TransactionListActivity::class.java).apply {
-                putExtra(TransactionListActivity.EXTRA_FILTER, filter.name)
-            }
+            Intent(this, TransactionEntryActivity::class.java)
+                .putExtra(TransactionEntryActivity.EXTRA_TRANSACTION_ID, id)
         )
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.home_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_admin -> {
-                startActivity(Intent(this, AdminActivity::class.java))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
+    private fun openList(filter: ListFilter) {
+        startActivity(
+            Intent(this, TransactionListActivity::class.java)
+                .putExtra(TransactionListActivity.EXTRA_FILTER, filter.name)
+        )
     }
 
     companion object {
         private const val PREFS_NAME = "main_activity"
         private const val KEY_STARTUP_PERMISSIONS_ASKED = "startup_permissions_asked"
+        private const val MAX_ROWS = 5
     }
 }
