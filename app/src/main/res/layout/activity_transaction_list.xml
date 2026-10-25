@@ -61,6 +61,80 @@
                         tools:text="12 to review"
                         tools:visibility="visible" />
 
+                    <LinearLayout
+                        android:id="@+id/rowListSearch"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        android:layout_marginTop="14dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_mono_search"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_marginStart="14dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_mono_search" />
+
+                            <EditText
+                                android:id="@+id/editListSearch"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:background="@null"
+                                android:hint="@string/list_search_hint"
+                                android:imeOptions="actionSearch"
+                                android:importantForAutofill="no"
+                                android:inputType="text"
+                                android:maxLines="1"
+                                android:paddingHorizontal="10dp"
+                                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                            <ImageButton
+                                android:id="@+id/buttonListSearchClear"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@null"
+                                android:contentDescription="@string/list_search_clear"
+                                android:src="@drawable/ic_mono_close"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="8dp">
+
+                            <ImageButton
+                                android:id="@+id/buttonListSort"
+                                style="@style/Widget.Mono.IconButton"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:contentDescription="@string/list_sort"
+                                android:src="@drawable/ic_mono_sort" />
+
+                            <View
+                                android:id="@+id/dotListSort"
+                                android:layout_width="10dp"
+                                android:layout_height="10dp"
+                                android:layout_gravity="top|end"
+                                android:layout_margin="2dp"
+                                android:background="@drawable/bg_mono_circle_yellow"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
                     <HorizontalScrollView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

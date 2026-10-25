@@ -32,7 +32,14 @@ import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerExporter
 import com.example.paymentsmstracker.export.MoneyManagerSync
 import com.example.paymentsmstracker.home.Money
+import com.example.paymentsmstracker.list.TransactionQuery
+import com.example.paymentsmstracker.list.TransactionSort
 import com.example.paymentsmstracker.merchant.MerchantMemory
+import com.example.paymentsmstracker.ui.OptionPickerBottomSheet
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import androidx.core.widget.doAfterTextChanged
+import android.widget.EditText
 import com.example.paymentsmstracker.ui.HatchDrawable
 import com.example.paymentsmstracker.ui.MonoNav
 import com.example.paymentsmstracker.viewmodel.ListFilter
@@ -60,6 +67,11 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     private val transactionListViewModel: TransactionListViewModel by viewModels()
     private var selectionModeActive = false
     private var lastListCount: Int = 0
+    private var rawTransactions: List<Transaction> = emptyList()
+    private var query = ""
+    private lateinit var monoRows: MonoRows
+    private var sort = TransactionSort.NEWEST
+    private val searchRunnable = Runnable { applyList(scrollTop = true) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,7 +125,88 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         setupFilterChips()
         setupRecyclerView()
         transactionAdapter.setListFilter(initialFilter)
+        setupSearchSort()
         observeViewModel()
+    }
+
+    private fun setupSearchSort() {
+        val prefs = getSharedPreferences("list_ui", MODE_PRIVATE)
+        sort = runCatching { TransactionSort.valueOf(prefs.getString("sort", null) ?: "") }
+            .getOrDefault(TransactionSort.NEWEST)
+        val edit = findViewById<EditText>(R.id.editListSearch)
+        val clear = findViewById<View>(R.id.buttonListSearchClear)
+        edit.doAfterTextChanged {
+            query = it?.toString().orEmpty()
+            clear.isVisible = query.isNotEmpty()
+            edit.removeCallbacks(searchRunnable)
+            edit.postDelayed(searchRunnable, 150)
+        }
+        edit.setOnEditorActionListener { v, action, _ ->
+            if (action == EditorInfo.IME_ACTION_SEARCH) {
+                getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(v.windowToken, 0)
+                v.clearFocus()
+                true
+            } else false
+        }
+        clear.setOnClickListener { edit.setText("") }
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING && edit.hasFocus()) {
+                    getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(edit.windowToken, 0)
+                    edit.clearFocus()
+                }
+            }
+        })
+        findViewById<View>(R.id.buttonListSort).setOnClickListener {
+            val labels = SORT_LABELS.map { (_, res) -> getString(res) }
+            OptionPickerBottomSheet.show(
+                this, getString(R.string.list_sort), labels,
+                getString(SORT_LABELS.first { it.first == sort }.second), spanCount = 1
+            ) { picked ->
+                sort = SORT_LABELS[labels.indexOf(picked)].first
+                prefs.edit().putString("sort", sort.name).apply()
+                applyList(scrollTop = true)
+            }
+        }
+    }
+
+    /** Filter + sort the raw rows and push them to the list. Search/sort are ignored in Send mode (REVIEWED). */
+    private fun applyList(scrollTop: Boolean = false) {
+        val filter = transactionListViewModel.currentFilter()
+        val sending = filter == ListFilter.REVIEWED
+        findViewById<View>(R.id.rowListSearch).isVisible = !sending
+        val q = if (sending) "" else query.trim()
+        val shown = if (sending) rawTransactions
+        else TransactionQuery.apply(rawTransactions, q, sort)
+        findViewById<View>(R.id.dotListSort).isVisible = !sending && sort != TransactionSort.NEWEST
+        transactionAdapter.setListFilter(filter)
+        val flat = !sending && sort != TransactionSort.NEWEST && sort != TransactionSort.OLDEST
+        if (monoRows.flat != flat) { monoRows.flat = flat; monoRows.notifyDataSetChanged() }
+        if (shown.isEmpty()) {
+            recyclerView.visibility = View.GONE
+            emptyStateTextView.visibility = View.VISIBLE
+            emptyStateTextView.text = if (q.isNotEmpty() && rawTransactions.isNotEmpty()) {
+                getString(R.string.list_empty_search, q)
+            } else when (filter) {
+                ListFilter.NEEDS_REVIEW -> getString(R.string.list_empty_needs_review)
+                ListFilter.REVIEWED -> getString(R.string.list_empty_reviewed)
+                ListFilter.MM_EXPORTED -> getString(R.string.list_empty_exported)
+                ListFilter.ALL -> getString(R.string.list_empty_all)
+            }
+            transactionAdapter.submitList(emptyList())
+            updateListSubtitle(0, filter)
+            renderMonoChrome(filter, emptyList())
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            emptyStateTextView.visibility = View.GONE
+            transactionAdapter.submitList(shown) {
+                if (scrollTop) recyclerView.scrollToPosition(0)
+            }
+            updateListSubtitle(shown.size, filter, q.isNotEmpty())
+            renderMonoChrome(filter, shown)
+        }
+        invalidateOptionsMenu()
+        if (selectionModeActive && (shown.isEmpty() || scrollTop)) exitSelectionMode()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -199,6 +292,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
             }
             transactionListViewModel.setFilter(filter)
             transactionAdapter.setListFilter(filter)
+            rawTransactions = emptyList()
             invalidateOptionsMenu()
             if (selectionModeActive) {
                 exitSelectionMode()
@@ -215,50 +309,29 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
     private fun setupRecyclerView() {
         transactionAdapter = TransactionAdapter(this)
-        recyclerView.adapter = MonoRows(transactionAdapter)
+        monoRows = MonoRows(transactionAdapter)
+        recyclerView.adapter = monoRows
         recyclerView.layoutManager = LinearLayoutManager(this)
     }
 
     private fun observeViewModel() {
         transactionListViewModel.allTransactions.observe(this) { transactions ->
-            val filter = transactionListViewModel.currentFilter()
-            transactionAdapter.setListFilter(filter)
-            if (transactions.isNullOrEmpty()) {
-                recyclerView.visibility = View.GONE
-                emptyStateTextView.visibility = View.VISIBLE
-                emptyStateTextView.text = when (filter) {
-                    ListFilter.NEEDS_REVIEW -> getString(R.string.list_empty_needs_review)
-                    ListFilter.REVIEWED -> getString(R.string.list_empty_reviewed)
-                    ListFilter.MM_EXPORTED -> getString(R.string.list_empty_exported)
-                    ListFilter.ALL -> getString(R.string.list_empty_all)
-                }
-                updateListSubtitle(0, filter)
-                renderMonoChrome(filter, emptyList())
-                invalidateOptionsMenu()
-                if (selectionModeActive) {
-                    exitSelectionMode()
-                }
-            } else {
-                recyclerView.visibility = View.VISIBLE
-                emptyStateTextView.visibility = View.GONE
-                transactionAdapter.submitList(transactions)
-                updateListSubtitle(transactions.size, filter)
-                renderMonoChrome(filter, transactions)
-                invalidateOptionsMenu()
-            }
+            rawTransactions = transactions.orEmpty()
+            applyList()
         }
     }
 
-    private fun updateListSubtitle(count: Int, filter: ListFilter) {
+    private fun updateListSubtitle(count: Int, filter: ListFilter, searching: Boolean = false) {
         lastListCount = count
         if (selectionModeActive) return
         val subtitle = findViewById<TextView>(R.id.textListSubtitle)
         subtitle.text = when {
             count <= 0 -> null
+            searching -> resources.getQuantityString(R.plurals.list_count_items, count, count)
             filter == ListFilter.NEEDS_REVIEW -> getString(R.string.list_count_to_review, count)
             filter == ListFilter.REVIEWED -> getString(R.string.list_count_reviewed, count)
             filter == ListFilter.MM_EXPORTED -> getString(R.string.list_count_exported, count)
-            else -> getString(R.string.list_count_items, count)
+            else -> resources.getQuantityString(R.plurals.list_count_items, count, count)
         }
         subtitle.isVisible = count > 0 && filter != ListFilter.REVIEWED
     }
@@ -281,7 +354,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         supportActionBar?.title = getString(R.string.transactions)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         updateExportButton()
-        updateListSubtitle(lastListCount, transactionListViewModel.currentFilter())
+        updateListSubtitle(lastListCount, transactionListViewModel.currentFilter(), query.isNotBlank())
         invalidateOptionsMenu()
     }
 
@@ -577,6 +650,9 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
         private val inner: TransactionAdapter
     ) : RecyclerView.Adapter<TransactionAdapter.TransactionViewHolder>() {
 
+        /** Amount/merchant sorts: no day headers (the shared adapter groups by day, which only makes sense by date). */
+        var flat = false
+
         private val day = SimpleDateFormat("d MMM", Locale.getDefault())
 
         init {
@@ -598,6 +674,7 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
 
         override fun onBindViewHolder(holder: TransactionAdapter.TransactionViewHolder, position: Int) {
             inner.onBindViewHolder(holder, position)
+            if (flat) holder.itemView.findViewById<View>(R.id.textViewGroupDate).visibility = View.GONE
             style(holder.itemView, inner.currentList[position])
         }
 
@@ -644,12 +721,18 @@ class TransactionListActivity : AppCompatActivity(), OnTransactionItemClickListe
     companion object {
         const val EXTRA_FILTER = "extra_list_filter"
 
+        private val SORT_LABELS = listOf(
+            TransactionSort.NEWEST to R.string.list_sort_newest,
+            TransactionSort.OLDEST to R.string.list_sort_oldest,
+            TransactionSort.AMOUNT_HIGH to R.string.list_sort_amount_high,
+            TransactionSort.AMOUNT_LOW to R.string.list_sort_amount_low,
+            TransactionSort.MERCHANT to R.string.list_sort_merchant
+        )
+
         /** Money.format with paise only when they exist, ₹ shrunk onto the baseline. */
         private fun rupees(amount: BigDecimal): CharSequence {
             val text = Money.format(amount, withPaise = amount.stripTrailingZeros().scale() > 0)
-            return SpannableString(text).apply {
-                setSpan(RelativeSizeSpan(0.72f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
+            return Money.styled(text, 0.72f)
         }
     }
 }
