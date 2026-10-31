@@ -37,6 +37,7 @@ import com.example.paymentsmstracker.home.Money
 import com.example.paymentsmstracker.merchant.MerchantMemory
 import com.example.paymentsmstracker.split.SplitAllocationResult
 import com.example.paymentsmstracker.split.SplitCalculator
+import com.example.paymentsmstracker.split.SplitDefaults
 import com.example.paymentsmstracker.split.SplitMode
 import com.example.paymentsmstracker.splitwise.SplitwiseApi
 import com.example.paymentsmstracker.splitwise.SplitwiseAuthStore
@@ -199,13 +200,12 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
         buttonDeleteTransaction.setOnClickListener { showDeleteConfirmationDialog() }
 
-        selectedSplitwiseGroupId = splitwiseStore.load().defaultGroupId
         setupPickers()
         setupFieldNavigation()
         setupSplitModeChips()
         updateDateButtonText()
         updatePickerLabels()
-        bindSplitwiseGroupMembers(preferSelectedIds = emptySet(), selectAllIfEmpty = true)
+        bindSplitwiseGroupMembers(preferSelectedIds = emptySet(), selectAllIfEmpty = false)
         updateSplitwiseGroupLabel()
         refreshSplitUi()
         updatePushVisibility()
@@ -232,6 +232,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         buttonOpenLocation.setOnClickListener { openLocationInMaps() }
         buttonToggleMore.setOnClickListener {
             toggleSection(containerMoreDetails, buttonToggleMore, R.string.add_split, R.string.hide_split)
+            if (containerMoreDetails.visibility == View.VISIBLE) preselectDefaultSplit()
         }
         buttonCustomizeSplit.setOnClickListener { toggleCustomizeSplit() }
         buttonPickSplitwiseGroup.setOnClickListener { openSplitwiseGroupPicker() }
@@ -364,6 +365,20 @@ class TransactionEntryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /** The default group only pre-fills the section after the user opens "Add split". */
+    private fun preselectDefaultSplit() {
+        val auth = splitwiseStore.load()
+        selectedSplitwiseGroupId = SplitDefaults.groupOnOpen(
+            selectedSplitwiseGroupId, auth.defaultGroupId, auth.groups.map { it.id }
+        )
+        bindSplitwiseGroupMembers(
+            preferSelectedIds = selectedParticipantIdMap().values.toSet(),
+            selectAllIfEmpty = selectedSplitwiseGroupId > 0L
+        )
+        updateSplitwiseGroupLabel()
+        updatePushVisibility()
     }
 
     private fun clearSplitSelection() {
@@ -883,8 +898,9 @@ class TransactionEntryActivity : AppCompatActivity() {
                 currentReviewStatus = tx.reviewStatus
                 // Exported rows can only be saved as exported; a "draft" would re-export them.
                 saveDraftButton.isVisible = tx.reviewStatus != ReviewStatus.EXPORTED
+                // Legacy split rows without a group fall back to the default; plain rows stay group-less.
                 selectedSplitwiseGroupId = tx.splitwiseGroupId.takeIf { it > 0L }
-                    ?: splitwiseStore.load().defaultGroupId
+                    ?: if (tx.participants.isNotBlank()) splitwiseStore.load().defaultGroupId else 0L
                 selectedSplitwiseExpenseId = tx.splitwiseExpenseId
                 loadedAllocations = SplitCalculator.parseAllocations(tx.splitAllocations)
                 loadedParticipantIds = tx.participantIdMap()
@@ -898,7 +914,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 // parsed allocations while the participant chip group is still empty.
                 bindSplitwiseGroupMembers(
                     preferSelectedIds = preferredIds,
-                    selectAllIfEmpty = preferredIds.isEmpty() && tx.participants.isBlank()
+                    selectAllIfEmpty = false
                 )
                 selectSplitModeChip(selectedSplitMode)
                 rebuildAllocationRows()
@@ -1076,7 +1092,9 @@ class TransactionEntryActivity : AppCompatActivity() {
         var merchant = merchantEditText.text.toString().trim()
         val notes = notesEditText.text.toString().trim()
         val transfer = isTransfer()
-        val participants = if (transfer) emptyList() else selectedParticipants()
+        val participants = SplitDefaults.participantsToSave(
+            transfer, containerMoreDetails.visibility == View.VISIBLE, selectedParticipants()
+        )
 
         if (amountStr.isEmpty()) {
             amountEditText.error = "Required"; return
