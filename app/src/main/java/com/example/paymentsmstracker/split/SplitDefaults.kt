@@ -9,4 +9,9 @@ object SplitDefaults {
     /** Group to show when the user opens "Add split": keep the current one, else the default if still valid. */
     fun groupOnOpen(current: Long, defaultId: Long, validIds: Collection<Long>): Long =
         if (current > 0L) current else defaultId.takeIf { it > 0L && it in validIds } ?: 0L
+
+    /** True when removing the split would throw away something the user set (so ask first). */
+    fun hasMeaningfulSplit(
+        groupId: Long, defaultId: Long, participantsDeviate: Boolean, customMode: Boolean, hasAmounts: Boolean
+    ): Boolean = (groupId > 0L && groupId != defaultId) || participantsDeviate || customMode || hasAmounts
 }

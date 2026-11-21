@@ -51,6 +51,7 @@
         <item name="borderlessButtonStyle">@style/Widget.Mono.Button.Text</item>
         <item name="materialCardViewStyle">@style/Widget.Mono.Card</item>
         <item name="chipStyle">@style/Widget.Mono.Chip</item>
+        <item name="materialSwitchStyle">@style/Widget.PaymentSmsTracker.Switch</item>
         <item name="toolbarStyle">@style/Widget.Mono.Toolbar</item>
     </style>
 
@@ -206,5 +207,13 @@
     <style name="Widget.Mono.Toolbar" parent="Widget.Material3.Toolbar">
         <item name="titleTextAppearance">@style/TextAppearance.Mono.H2</item>
         <item name="android:background">@color/mono_bg</item>
+    </style>
+
+    <!-- Mono switch: ON = ink track + contrast thumb; OFF = grey track, ink outline, ink thumb. -->
+    <style name="Widget.PaymentSmsTracker.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="trackTint">@color/mono_switch_track</item>
+        <item name="trackDecorationTint">@color/mono_switch_outline</item>
+        <item name="thumbTint">@color/mono_switch_thumb</item>
+        <item name="thumbIconTint">@android:color/transparent</item>
     </style>
 </resources>

@@ -93,6 +93,9 @@
         <activity android:name=".TransactionListActivity" />
         <activity android:name=".SplitsActivity" />
         <activity
+            android:name=".InsightsActivity"
+            android:exported="false" />
+        <activity
             android:name=".AgentChatActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />

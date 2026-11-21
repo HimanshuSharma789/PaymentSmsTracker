@@ -231,8 +231,12 @@ class TransactionEntryActivity : AppCompatActivity() {
         }
         buttonOpenLocation.setOnClickListener { openLocationInMaps() }
         buttonToggleMore.setOnClickListener {
-            toggleSection(containerMoreDetails, buttonToggleMore, R.string.add_split, R.string.hide_split)
-            if (containerMoreDetails.visibility == View.VISIBLE) preselectDefaultSplit()
+            if (containerMoreDetails.visibility == View.VISIBLE) {
+                requestRemoveSplit()
+            } else {
+                showSplitSection(true)
+                preselectDefaultSplit()
+            }
         }
         buttonCustomizeSplit.setOnClickListener { toggleCustomizeSplit() }
         buttonPickSplitwiseGroup.setOnClickListener { openSplitwiseGroupPicker() }
@@ -381,14 +385,44 @@ class TransactionEntryActivity : AppCompatActivity() {
         updatePushVisibility()
     }
 
+    /** Open state reads "Remove split" (with a delete icon); closed reads "Add split". */
+    private fun showSplitSection(open: Boolean) {
+        containerMoreDetails.visibility = if (open) View.VISIBLE else View.GONE
+        buttonToggleMore.setText(if (open) R.string.remove_split else R.string.add_split)
+        buttonToggleMore.setIconResource(if (open) R.drawable.outline_delete_24 else R.drawable.ic_mono_people)
+    }
+
+    /** Clears the split at once, or after a confirm when the user has set something. */
+    private fun requestRemoveSplit() {
+        if (selectedSplitwiseExpenseId > 0L) {
+            Toast.makeText(this, R.string.remove_split_pushed, Toast.LENGTH_LONG).show()
+            return
+        }
+        val auth = splitwiseStore.load()
+        val meaningful = SplitDefaults.hasMeaningfulSplit(
+            selectedSplitwiseGroupId, auth.defaultGroupId,
+            participantsDeviate = selectedParticipants().size != chipGroupParticipants.childCount,
+            customMode = selectedSplitMode != SplitMode.EQUAL,
+            hasAmounts = allocationInputs.isNotEmpty()
+        )
+        if (!meaningful) {
+            clearSplitSelection(); return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.remove_split_title)
+            .setMessage(R.string.remove_split_message)
+            .setPositiveButton(R.string.remove_split_confirm) { _, _ -> clearSplitSelection() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun clearSplitSelection() {
         selectedSplitwiseGroupId = 0L
         selectedSplitwiseExpenseId = 0L
         selectSplitModeChip(SplitMode.EQUAL)
         allocationInputs.clear()
         bindSplitwiseGroupMembers(preferSelectedIds = emptySet(), selectAllIfEmpty = false)
-        containerMoreDetails.visibility = View.GONE
-        buttonToggleMore.setText(R.string.add_split)
+        showSplitSection(false)
         updatePushVisibility()
     }
 
@@ -512,7 +546,7 @@ class TransactionEntryActivity : AppCompatActivity() {
         )
         splitHeaderRow.visibility = if (transfer) View.GONE else View.VISIBLE
         if (transfer) {
-            containerMoreDetails.visibility = View.GONE
+            showSplitSection(false)
         }
     }
 
@@ -922,8 +956,7 @@ class TransactionEntryActivity : AppCompatActivity() {
                 updateSplitwiseGroupLabel()
                 updatePushVisibility()
                 if (!isTransfer() && (tx.participants.isNotBlank() || tx.splitwiseGroupId > 0L)) {
-                    containerMoreDetails.visibility = View.VISIBLE
-                    buttonToggleMore.setText(R.string.hide_split)
+                    showSplitSection(true)
                 }
                 originalSmsFromIntent = tx.originalSms
                 referenceFromIntent = tx.referenceNumber
@@ -986,17 +1019,6 @@ class TransactionEntryActivity : AppCompatActivity() {
             .filter { (label, _) -> names.any { it.equals(label, ignoreCase = true) } }
             .map { it.second }
             .toSet()
-    }
-
-    private fun toggleSection(
-        section: View,
-        button: MaterialButton,
-        showText: Int,
-        hideText: Int
-    ) {
-        val willShow = section.visibility != View.VISIBLE
-        section.visibility = if (willShow) View.VISIBLE else View.GONE
-        button.setText(if (willShow) hideText else showText)
     }
 
     private fun updateDateButtonText() {

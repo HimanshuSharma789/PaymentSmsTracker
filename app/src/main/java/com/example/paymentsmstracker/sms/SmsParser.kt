@@ -18,7 +18,9 @@ data class ParsedSms(
     val matchedRuleId: String?,
     val matchedRuleName: String?,
     /** True when calendar date (and optionally time) came from the SMS body. */
-    val timestampFromMessage: Boolean = false
+    val timestampFromMessage: Boolean = false,
+    /** Destination account when detected as a transfer; blank otherwise. */
+    val transferTo: String = ""
 )
 
 class SmsParser(private val config: AppConfig) {
@@ -123,17 +125,9 @@ class SmsParser(private val config: AppConfig) {
         val type = if (rule.isTransfer) "Transfer-Out" else if (rule.isExpense) "Expense" else "Income"
         val cleanedMerchant = cleanMerchant(merchant)
 
-        // Credit-card bill style UPI: "trf to HDFC Bank Credit"
-        val resolvedType = if (
-            type == "Expense" &&
-            cleanedMerchant.contains("credit", ignoreCase = true) &&
-            (cleanedMerchant.contains("hdfc", ignoreCase = true) ||
-                cleanedMerchant.contains("sbi", ignoreCase = true))
-        ) {
-            "Transfer-Out"
-        } else {
-            type
-        }
+        // Payments to an account flagged "not spending" (e.g. card bill) win over the SMS rule's type.
+        val transferTo = if (type == "Expense") TransferRules.detect(cleanedMerchant, config) else null
+        val resolvedType = if (transferTo != null) "Transfer-Out" else type
 
         return ParsedSms(
             amount = amount,
@@ -145,7 +139,8 @@ class SmsParser(private val config: AppConfig) {
             transactionType = resolvedType,
             matchedRuleId = rule.id,
             matchedRuleName = rule.name,
-            timestampFromMessage = resolved.fromMessage
+            timestampFromMessage = resolved.fromMessage,
+            transferTo = transferTo.orEmpty()
         )
     }
 
@@ -166,6 +161,7 @@ class SmsParser(private val config: AppConfig) {
             receivedAtMs = receivedAtMs
         )
 
+        val transferTo = TransferRules.detect(merchant, config)
         return ParsedSms(
             amount = amount,
             merchantName = merchant,
@@ -173,10 +169,11 @@ class SmsParser(private val config: AppConfig) {
             referenceNumber = reference,
             account = "",
             isExpense = true,
-            transactionType = "Expense",
+            transactionType = if (transferTo != null) "Transfer-Out" else "Expense",
             matchedRuleId = null,
             matchedRuleName = "fallback",
-            timestampFromMessage = resolved.fromMessage
+            timestampFromMessage = resolved.fromMessage,
+            transferTo = transferTo.orEmpty()
         )
     }
 

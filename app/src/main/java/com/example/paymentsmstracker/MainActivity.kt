@@ -98,6 +98,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialCardView>(R.id.cardHomeSplits).setOnClickListener {
             startActivity(Intent(this, SplitsActivity::class.java))
         }
+        findViewById<MaterialCardView>(R.id.cardHomeInsights).setOnClickListener {
+            startActivity(Intent(this, InsightsActivity::class.java))
+        }
         MonoNav.bind(this, MonoNav.Tab.HOME)
 
         observeHome()

@@ -47,7 +47,9 @@ data class AppConfig(
      * SMS senders containing any of these (case-insensitive) are read as bank SMS, live and in
      * backfill. Empty = accept every sender. Indian bank IDs look like "VM-HDFCBK", "AD-SBIUPI".
      */
-    val bankSenderTokens: List<String> = DEFAULT_BANK_SENDER_TOKENS
+    val bankSenderTokens: List<String> = DEFAULT_BANK_SENDER_TOKENS,
+    /** Accounts whose payments are transfers of the user's own money (card bills), not spending. */
+    val accountsNotSpending: List<String> = defaultNotSpending(DEFAULT_ACCOUNTS)
 ) {
     /** Null/blank sender (Admin test SMS) is always accepted. */
     fun isBankSender(address: String?): Boolean {
@@ -64,6 +66,10 @@ data class AppConfig(
             "AMEX", "PAYTM", "AIRTEL", "AIRBNK", "PHONEPE", "GPAY", "GOOGLEPAY", "AMAZONPAY",
             "MOBIKWIK", "FREECHARGE", "CRED", "SLICE", "ONECARD", "JUPITER", "NIYO", "BHIM"
         )
+
+        /** Credit-card accounts default to "not spending"; everything else counts. */
+        fun defaultNotSpending(accounts: List<String>) =
+            accounts.filter { it.contains("credit card", ignoreCase = true) }
 
         val DEFAULT_ACCOUNTS = listOf(
             "Cash",

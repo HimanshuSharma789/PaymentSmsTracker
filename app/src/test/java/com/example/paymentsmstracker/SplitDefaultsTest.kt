@@ -20,4 +20,13 @@ class SplitDefaultsTest {
         assertEquals(0L, SplitDefaults.groupOnOpen(0L, 9L, listOf(1L)))
         assertEquals(0L, SplitDefaults.groupOnOpen(0L, 0L, listOf(1L)))
     }
+
+    @Test fun meaningfulSplitOnlyWhenUserSetSomething() {
+        assertEquals(false, SplitDefaults.hasMeaningfulSplit(9L, 9L, false, false, false))
+        assertEquals(false, SplitDefaults.hasMeaningfulSplit(0L, 9L, false, false, false))
+        assertEquals(true, SplitDefaults.hasMeaningfulSplit(5L, 9L, false, false, false))
+        assertEquals(true, SplitDefaults.hasMeaningfulSplit(9L, 9L, true, false, false))
+        assertEquals(true, SplitDefaults.hasMeaningfulSplit(9L, 9L, false, true, false))
+        assertEquals(true, SplitDefaults.hasMeaningfulSplit(9L, 9L, false, false, true))
+    }
 }

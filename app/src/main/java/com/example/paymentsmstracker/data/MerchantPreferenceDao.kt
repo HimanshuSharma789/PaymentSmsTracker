@@ -20,6 +20,9 @@ interface MerchantPreferenceDao {
     @Query("DELETE FROM merchant_prefs")
     suspend fun deleteAll()
 
+    @Query("SELECT * FROM merchant_prefs")
+    suspend fun getAll(): List<MerchantPreference>
+
     @Query("SELECT COUNT(*) FROM merchant_prefs")
     suspend fun count(): Int
 }

@@ -12,6 +12,7 @@ This is a **local-first Android app** that turns bank/UPI payment SMS into revie
 - MM TSV shape: `export/MoneyManagerExporter.kt` only.
 - SMS rules: JSON in `AppConfig` / Admin, named groups `amount`, `merchant`, `date`, `reference`, `accountHint`. Wizard: `SmsRuleWizardActivity` + `sms/SmsRuleBuilder.kt`.
 - Merchant memory: `merchant/MerchantMemory.kt` + Room `merchant_prefs` (survives export purge).
+- Per-account `accountsNotSpending` (Admin → Basics switches; credit-card accounts default OFF): SMS paid to such an account becomes Transfer-Out (category = that account), excluded from spending; detection is `sms/TransferRules.kt`, wins over merchant memory, and "Apply to existing entries" retro-flips unexported rows.
 - Default split-to-MM: your share → chosen category; friends → `debtCategory`/`debtSubcategory` (Social Life / Dues). Flag `mmFullSplitAsOwnExpense` changes MM only.
 - MM-exported rows are kept until the user deletes them (Admin → clear all MM exported, or delete older than 30 days).
 - AI Assist (`agent/`, `AgentChatActivity`; settings in Admin → AI Assist tab) is the one opt-in cloud exception: off by default, user's own key for Claude, OpenRouter or any OpenAI-compatible endpoint (`agent_secure` prefs, excluded from backup). What the model may read is chosen per field in `AgentPrivacy`; `AgentData` is the only place app data becomes model JSON (reference numbers and tokens never). The model only proposes via tools; `AgentProposal.validate` checks each proposal and `AgentApplier` writes Room only when the user taps Apply. Money math is local (`SplitCalculator`, summarize tools).
@@ -26,6 +27,8 @@ This is a **local-first Android app** that turns bank/UPI payment SMS into revie
 | Review UI | `TransactionEntryActivity.kt`, `TransactionListActivity.kt` |
 | Config | `config/AppConfig.kt`, `config/ConfigStore.kt`, `AdminActivity.kt` |
 | Splits / Splitwise | `SplitsActivity.kt`, `splitwise/` |
+| Ledger backup / restore | `backup/LedgerBackup.kt`, `AdminActivity.kt` (Maintenance) |
+| Insights (read-only month view) | `InsightsActivity.kt`, `insights/InsightsCalculator.kt` |
 | LAN web | `server/`, `app/src/main/assets/lan_web/` |
 | Tests | `app/src/test/java/com/example/paymentsmstracker/` |
 

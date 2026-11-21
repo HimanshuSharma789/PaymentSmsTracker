@@ -76,6 +76,7 @@ class ConfigStore(context: Context) {
             .put("nightlyReviewMinute", config.nightlyReviewMinute)
             .put("themeMode", config.themeMode)
             .put("bankSenderTokens", JSONArray(config.bankSenderTokens))
+            .put("accountsNotSpending", JSONArray(config.accountsNotSpending))
     }
 
     companion object {
@@ -186,7 +187,9 @@ class ConfigStore(context: Context) {
                 nightlyReviewMinute = obj.optInt("nightlyReviewMinute", 0).coerceIn(0, 59),
                 themeMode = ThemeMode.normalize(obj.optString("themeMode", ThemeMode.DEFAULT)),
                 bankSenderTokens = obj.optJSONArray("bankSenderTokens")?.toStringList()
-                    ?: AppConfig.DEFAULT_BANK_SENDER_TOKENS
+                    ?: AppConfig.DEFAULT_BANK_SENDER_TOKENS,
+                accountsNotSpending = obj.optJSONArray("accountsNotSpending")?.toStringList()
+                    ?: AppConfig.defaultNotSpending(accounts)
             )
         }
 

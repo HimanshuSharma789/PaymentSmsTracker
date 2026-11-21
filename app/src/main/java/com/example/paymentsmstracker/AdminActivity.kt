@@ -18,8 +18,14 @@ import androidx.lifecycle.lifecycleScope
 import com.example.paymentsmstracker.agent.AgentPrivacy
 import com.example.paymentsmstracker.agent.AgentProvider
 import com.example.paymentsmstracker.agent.AgentSettings
+import com.example.paymentsmstracker.backup.LedgerBackup
+import com.example.paymentsmstracker.backup.Snapshot
+import com.example.paymentsmstracker.config.AccountEdits
+import com.example.paymentsmstracker.config.AppConfig
 import com.example.paymentsmstracker.config.ConfigStore
 import com.example.paymentsmstracker.data.AppDatabase
+import com.example.paymentsmstracker.sms.TransferRules
+import com.example.paymentsmstracker.ui.OptionPickerBottomSheet
 import com.example.paymentsmstracker.data.ReviewStatus
 import com.example.paymentsmstracker.data.Transaction
 import com.example.paymentsmstracker.export.MoneyManagerSync
@@ -43,6 +49,7 @@ import com.example.paymentsmstracker.viewmodel.ListFilter
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.tabs.TabLayout
@@ -65,7 +72,6 @@ class AdminActivity : AppCompatActivity() {
 
     private lateinit var configStore: ConfigStore
     private lateinit var splitwiseStore: SplitwiseAuthStore
-    private lateinit var editAccounts: TextInputEditText
     private lateinit var switchMmFullSplitAsOwn: MaterialSwitch
     private lateinit var layoutDebtCategory: TextInputLayout
     private lateinit var layoutDebtSubcategory: TextInputLayout
@@ -83,6 +89,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var textBackfillResult: android.widget.TextView
     private lateinit var textParseResult: android.widget.TextView
     private lateinit var panelBasics: View
+    private lateinit var panelAccounts: View
     private lateinit var panelSplitwise: View
     private lateinit var panelTheme: View
     private lateinit var panelLaptop: View
@@ -140,6 +147,19 @@ class AdminActivity : AppCompatActivity() {
             }
         }
 
+    private var pendingBackupPassword = ""
+
+    private val createBackupLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+            if (uri != null) runBackup(uri, pendingBackupPassword)
+            pendingBackupPassword = ""
+        }
+
+    private val openBackupLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) askPassword(confirm = false) { runRestore(uri, it) }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_admin)
@@ -159,7 +179,6 @@ class AdminActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener { finish() }
 
-        editAccounts = findViewById(R.id.editAccounts)
         switchMmFullSplitAsOwn = findViewById(R.id.switchMmFullSplitAsOwn)
         layoutDebtCategory = findViewById(R.id.layoutDebtCategory)
         layoutDebtSubcategory = findViewById(R.id.layoutDebtSubcategory)
@@ -177,6 +196,7 @@ class AdminActivity : AppCompatActivity() {
         textBackfillResult = findViewById(R.id.textBackfillResult)
         textParseResult = findViewById(R.id.textParseResult)
         panelBasics = findViewById(R.id.panelBasics)
+        panelAccounts = findViewById(R.id.panelAccounts)
         panelSplitwise = findViewById(R.id.panelSplitwise)
         panelTheme = findViewById(R.id.panelTheme)
         panelLaptop = findViewById(R.id.panelLaptop)
@@ -227,6 +247,8 @@ class AdminActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.buttonSaveBasics).setOnClickListener { saveBasics() }
+        findViewById<MaterialButton>(R.id.buttonAddAccount).setOnClickListener { askAccountName(null) }
+        findViewById<MaterialButton>(R.id.buttonApplyTransferRules).setOnClickListener { applyTransferRules() }
         findViewById<MaterialButton>(R.id.buttonSaveTheme).setOnClickListener { saveTheme() }
         buttonLanStart.setOnClickListener { startLanServer() }
         buttonLanStop.setOnClickListener { stopLanServer() }
@@ -293,6 +315,16 @@ class AdminActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.buttonClearAll).setOnClickListener {
             confirmClearAll()
         }
+        findViewById<MaterialButton>(R.id.buttonBackupLedger).setOnClickListener {
+            askPassword(confirm = true) {
+                pendingBackupPassword = it
+                val day = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+                createBackupLauncher.launch("paymentsms-backup-$day.pstb")
+            }
+        }
+        findViewById<MaterialButton>(R.id.buttonRestoreLedger).setOnClickListener {
+            openBackupLauncher.launch(arrayOf("*/*"))
+        }
 
         setupAiSettings()
         findViewById<MaterialButton>(R.id.buttonSplitwiseSaveCredentials).setOnClickListener {
@@ -314,7 +346,7 @@ class AdminActivity : AppCompatActivity() {
             splitwiseStore.saveCredentials(key, secret)
             SplitwiseWebAuthActivity.start(this, oauthMode = true)
         }
-        findViewById<MaterialButton>(R.id.buttonSplitwiseAdvancedToggle).setOnClickListener {
+        findViewById<View>(R.id.buttonSplitwiseAdvancedToggle).setOnClickListener {
             toggleSplitwiseAdvancedOAuth()
         }
         findViewById<MaterialButton>(R.id.buttonSplitwiseSignOut).setOnClickListener {
@@ -329,7 +361,7 @@ class AdminActivity : AppCompatActivity() {
         buttonSplitwiseDefaultGroup.setOnClickListener { pickDefaultSplitwiseGroup() }
 
         if (intent.getBooleanExtra(SplitwiseOAuthActivity.EXTRA_OPEN_SPLITWISE_TAB, false)) {
-            tabLayoutAdmin.getTabAt(1)?.select()
+            tabLayoutAdmin.getTabAt(2)?.select()
         }
     }
 
@@ -337,7 +369,7 @@ class AdminActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra(SplitwiseOAuthActivity.EXTRA_OPEN_SPLITWISE_TAB, false)) {
-            tabLayoutAdmin.getTabAt(1)?.select()
+            tabLayoutAdmin.getTabAt(2)?.select()
             bindSplitwiseUi()
         }
     }
@@ -345,6 +377,7 @@ class AdminActivity : AppCompatActivity() {
     private fun setupTabs() {
         val tabs = tabLayoutAdmin
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_basics))
+        tabs.addTab(tabs.newTab().setText(R.string.admin_tab_accounts))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_splitwise))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_theme))
         tabs.addTab(tabs.newTab().setText(R.string.admin_tab_laptop))
@@ -363,16 +396,18 @@ class AdminActivity : AppCompatActivity() {
 
     private fun showPanel(index: Int) {
         panelBasics.visibility = if (index == 0) View.VISIBLE else View.GONE
-        panelSplitwise.visibility = if (index == 1) View.VISIBLE else View.GONE
-        panelTheme.visibility = if (index == 2) View.VISIBLE else View.GONE
-        panelLaptop.visibility = if (index == 3) View.VISIBLE else View.GONE
-        panelRules.visibility = if (index == 4) View.VISIBLE else View.GONE
-        panelTest.visibility = if (index == 5) View.VISIBLE else View.GONE
-        panelMaintenance.visibility = if (index == 6) View.VISIBLE else View.GONE
-        panelPermissions.visibility = if (index == 7) View.VISIBLE else View.GONE
-        panelAi.visibility = if (index == 8) View.VISIBLE else View.GONE
-        if (index == 7) permissionsPanel.refresh()
-        if (index == 3) {
+        panelAccounts.visibility = if (index == 1) View.VISIBLE else View.GONE
+        panelSplitwise.visibility = if (index == 2) View.VISIBLE else View.GONE
+        panelTheme.visibility = if (index == 3) View.VISIBLE else View.GONE
+        panelLaptop.visibility = if (index == 4) View.VISIBLE else View.GONE
+        panelRules.visibility = if (index == 5) View.VISIBLE else View.GONE
+        panelTest.visibility = if (index == 6) View.VISIBLE else View.GONE
+        panelMaintenance.visibility = if (index == 7) View.VISIBLE else View.GONE
+        panelPermissions.visibility = if (index == 8) View.VISIBLE else View.GONE
+        panelAi.visibility = if (index == 9) View.VISIBLE else View.GONE
+        if (index == 1) renderAccounts()
+        if (index == 8) permissionsPanel.refresh()
+        if (index == 4) {
             refreshLanStatusUi()
             lanUiHandler.removeCallbacks(lanUiTicker)
             if (LanServerState.get().running) {
@@ -381,7 +416,7 @@ class AdminActivity : AppCompatActivity() {
         } else {
             lanUiHandler.removeCallbacks(lanUiTicker)
         }
-        if (index == 1) bindSplitwiseUi()
+        if (index == 2) bindSplitwiseUi()
     }
 
     private var splitwiseAdvancedOAuthExpanded = false
@@ -497,10 +532,13 @@ class AdminActivity : AppCompatActivity() {
             SplitwiseAuthMethod.TOKEN -> getString(R.string.splitwise_auth_method_token)
             SplitwiseAuthMethod.NONE -> getString(R.string.splitwise_auth_method_none)
         }
-        if (auth.resolvedAuthMethod == SplitwiseAuthMethod.OAUTH) {
+        // Token and OAuth users must never have their own fields hidden.
+        if (auth.resolvedAuthMethod == SplitwiseAuthMethod.OAUTH ||
+            auth.resolvedAuthMethod == SplitwiseAuthMethod.TOKEN
+        ) {
             splitwiseAdvancedOAuthExpanded = true
         }
-        applySplitwiseAdvancedOAuthVisibility()
+        applySplitwiseAdvancedOAuthVisibility(animate = false)
         textSplitwiseGroups.text = getString(R.string.splitwise_groups_label, auth.groups.size)
         val defaultName = auth.groupById(auth.defaultGroupId)?.name
         buttonSplitwiseDefaultGroup.text = if (defaultName != null) {
@@ -512,19 +550,18 @@ class AdminActivity : AppCompatActivity() {
 
     private fun toggleSplitwiseAdvancedOAuth() {
         splitwiseAdvancedOAuthExpanded = !splitwiseAdvancedOAuthExpanded
-        applySplitwiseAdvancedOAuthVisibility()
+        applySplitwiseAdvancedOAuthVisibility(animate = true)
     }
 
-    private fun applySplitwiseAdvancedOAuthVisibility() {
-        val card = findViewById<View>(R.id.cardSplitwiseOAuthAuth)
-        val toggle = findViewById<MaterialButton>(R.id.buttonSplitwiseAdvancedToggle)
-        card.visibility = if (splitwiseAdvancedOAuthExpanded) View.VISIBLE else View.GONE
-        toggle.setText(
-            if (splitwiseAdvancedOAuthExpanded) {
-                R.string.splitwise_auth_advanced_hide
-            } else {
-                R.string.splitwise_auth_advanced
-            }
+    private fun applySplitwiseAdvancedOAuthVisibility(animate: Boolean) {
+        val expanded = splitwiseAdvancedOAuthExpanded
+        findViewById<View>(R.id.layoutSplitwiseAdvanced).visibility = if (expanded) View.VISIBLE else View.GONE
+        val chevron = findViewById<View>(R.id.imageSplitwiseAdvancedChevron)
+        val target = if (expanded) 180f else 0f
+        if (animate) chevron.animate().rotation(target).setDuration(150).start() else chevron.rotation = target
+        androidx.core.view.ViewCompat.setStateDescription(
+            findViewById(R.id.buttonSplitwiseAdvancedToggle),
+            getString(if (expanded) R.string.state_expanded else R.string.state_collapsed)
         )
     }
 
@@ -729,7 +766,6 @@ class AdminActivity : AppCompatActivity() {
 
     private fun bindFromStore() {
         val config = configStore.load()
-        editAccounts.setText(config.accounts.joinToString(", "))
         switchMmFullSplitAsOwn.isChecked = config.mmFullSplitAsOwnExpense
         editDebtCategory.setText(config.debtCategory)
         editDebtSubcategory.setText(config.debtSubcategory)
@@ -753,6 +789,7 @@ class AdminActivity : AppCompatActivity() {
         updateDebtCategoryEnabled()
         updateNightlyTimeEnabled()
         refreshThemeModeHint()
+        renderAccounts()
     }
 
     private fun selectThemeModeChip(mode: String) {
@@ -841,7 +878,6 @@ class AdminActivity : AppCompatActivity() {
             val current = configStore.load()
             configStore.save(
                 current.copy(
-                    accounts = splitCsv(editAccounts.text?.toString()),
                     mmFullSplitAsOwnExpense = switchMmFullSplitAsOwn.isChecked,
                     debtCategory = editDebtCategory.text?.toString()?.trim().orEmpty()
                         .ifBlank { current.debtCategory },
@@ -1309,14 +1345,209 @@ class AdminActivity : AppCompatActivity() {
         }
     }
 
-    private fun splitCsv(raw: String?): List<String> =
-        raw.orEmpty().split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+    private fun askPassword(confirm: Boolean, onOk: (String) -> Unit) {
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val box = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+        fun field(hint: Int) = TextInputLayout(this).apply {
+            this.hint = getString(hint)
+            addView(TextInputEditText(context).apply {
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            })
+            box.addView(this)
+        }
+        if (confirm) {
+            box.addView(TextView(this).apply { setText(R.string.backup_password_warning) })
+        }
+        val pw = field(R.string.backup_password_hint)
+        val pw2 = if (confirm) field(R.string.backup_password_confirm_hint) else null
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.backup_password_title)
+            .setView(box)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val a = pw.editText?.text?.toString().orEmpty()
+                when {
+                    a.length < LedgerBackup.MIN_PASSWORD ->
+                        pw.error = getString(R.string.backup_password_short)
+                    pw2 != null && a != pw2.editText?.text?.toString() ->
+                        pw2.error = getString(R.string.backup_password_mismatch)
+                    else -> { dialog.dismiss(); onOk(a) }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun runBackup(uri: android.net.Uri, password: String) {
+        lifecycleScope.launch {
+            val msg = try {
+                withContext(Dispatchers.IO) {
+                    val db = AppDatabase.getDatabase(applicationContext)
+                    val txs = db.transactionDao().getAllTransactionsList()
+                    val prefs = db.merchantPreferenceDao().getAll()
+                    val bytes = LedgerBackup.encode(Snapshot(LedgerBackup.FORMAT_VERSION, DB_VERSION, txs, prefs), password)
+                    contentResolver.openOutputStream(uri, "wt")!!.use { it.write(bytes) }
+                    getString(R.string.backup_done, txs.size, prefs.size)
+                }
+            } catch (e: Exception) {
+                getString(R.string.backup_failed, e.message ?: e.javaClass.simpleName)
+            }
+            Snackbar.make(findViewById(android.R.id.content), msg, Snackbar.LENGTH_LONG).show()
+        }
+    }
+
+    private fun runRestore(uri: android.net.Uri, password: String) {
+        lifecycleScope.launch {
+            val msg = try {
+                withContext(Dispatchers.IO) {
+                    val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                    val snap = LedgerBackup.decode(bytes, password)
+                    val db = AppDatabase.getDatabase(applicationContext)
+                    val r = LedgerBackup.merge(
+                        db.transactionDao().getAllTransactionsList(),
+                        db.merchantPreferenceDao().getAll(),
+                        snap
+                    )
+                    r.transactionsToAdd.forEach { db.transactionDao().insertTransaction(it) }
+                    r.prefsToAdd.forEach { db.merchantPreferenceDao().upsert(it) }
+                    getString(
+                        R.string.restore_done, r.transactionsToAdd.size, r.transactionsSkipped,
+                        r.prefsToAdd.size, r.prefsSkipped
+                    )
+                }
+            } catch (e: Exception) {
+                getString(R.string.restore_failed, e.message ?: e.javaClass.simpleName)
+            }
+            Snackbar.make(findViewById(android.R.id.content), msg, Snackbar.LENGTH_LONG).show()
+        }
+    }
+
+    /** Saves one account edit immediately, on top of the latest stored config. */
+    private fun editAccounts(edit: (AppConfig) -> AppConfig) {
+        configStore.save(edit(configStore.load()))
+        renderAccounts()
+    }
+
+    private fun renderAccounts() {
+        val config = configStore.load()
+        val list = findViewById<android.widget.LinearLayout>(R.id.listAccounts)
+        list.removeAllViews()
+        findViewById<View>(R.id.textAccountsEmpty).visibility =
+            if (config.accounts.isEmpty()) View.VISIBLE else View.GONE
+        config.accounts.forEach { name ->
+            val row = layoutInflater.inflate(R.layout.item_account_row, list, false)
+            row.findViewById<TextView>(R.id.textAccountName).text = name
+            val counts = AccountEdits.countsAsSpending(config, name)
+            row.findViewById<TextView>(R.id.textAccountState).setText(
+                if (counts) R.string.account_state_spending else R.string.account_state_transfer
+            )
+            row.findViewById<MaterialSwitch>(R.id.switchAccountSpending).apply {
+                isSaveEnabled = false // rows share view ids; restored state would fire the listener and overwrite saved flags
+                isChecked = counts
+                setOnCheckedChangeListener { _, on ->
+                    editAccounts { AccountEdits.setCountsAsSpending(it, name, on) }
+                }
+            }
+            row.findViewById<View>(R.id.accountNameArea).setOnClickListener { askAccountName(name) }
+            row.findViewById<View>(R.id.buttonAccountDelete).setOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.account_delete_title, name))
+                    .setMessage(R.string.account_delete_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.account_delete) { _, _ -> editAccounts { AccountEdits.remove(it, name) } }
+                    .show()
+            }
+            list.addView(row)
+        }
+    }
+
+    /** Add dialog when [old] is null, rename dialog otherwise. */
+    private fun askAccountName(old: String?) {
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val box = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+        val field = TextInputLayout(this).apply {
+            hint = getString(R.string.account_name_hint)
+            addView(TextInputEditText(context).apply {
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                setText(old.orEmpty())
+                setSelection(text?.length ?: 0)
+            })
+            box.addView(this)
+        }
+        if (old != null) {
+            box.addView(TextView(this).apply {
+                setText(R.string.account_rename_note)
+                setPadding(0, pad / 2, 0, 0)
+            })
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(if (old == null) R.string.account_add_title else R.string.account_rename_title)
+            .setView(box)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = field.editText?.text?.toString().orEmpty().trim()
+                val error = AccountEdits.validate(configStore.load(), name, except = old)
+                if (error != null) {
+                    field.error = error
+                } else {
+                    editAccounts { if (old == null) AccountEdits.add(it, name) else AccountEdits.rename(it, old, name) }
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun applyTransferRules() {
+        val config = configStore.load()
+        lifecycleScope.launch {
+            val dao = AppDatabase.getDatabase(applicationContext).transactionDao()
+            val plan = withContext(Dispatchers.IO) { TransferRules.plan(dao.getAllTransactionsList(), config) }
+            val root = findViewById<View>(android.R.id.content)
+            if (plan.changes.isEmpty()) {
+                Snackbar.make(root, getString(R.string.transfer_apply_none, plan.skipped), Snackbar.LENGTH_LONG).show()
+                return@launch
+            }
+            AlertDialog.Builder(this@AdminActivity)
+                .setTitle(R.string.transfer_rules_apply)
+                .setMessage(getString(R.string.transfer_apply_confirm, plan.changes.size, plan.skipped))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    lifecycleScope.launch {
+                        // Recompute at apply time so rows edited meanwhile are re-checked.
+                        val done = withContext(Dispatchers.IO) {
+                            TransferRules.plan(dao.getAllTransactionsList(), config)
+                                .also { p -> p.changes.forEach { dao.updateTransaction(it) } }
+                        }
+                        Snackbar.make(root, getString(R.string.transfer_apply_done, done.changes.size, done.skipped), Snackbar.LENGTH_LONG).show()
+                    }
+                }
+                .show()
+        }
+    }
 
     private fun q(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    private companion object {
+        const val DB_VERSION = 9 // keep in step with AppDatabase @Database(version)
     }
 
     private data class BackfillResult(
