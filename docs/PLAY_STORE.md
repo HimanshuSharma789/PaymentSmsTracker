@@ -199,7 +199,7 @@ unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E '\.so$|progu
 
 ## 11. Releasing (GitHub)
 1. Bump `versionName` and `versionCode` in `app/build.gradle.kts` and merge to `master`.
-2. `git tag vX.Y.Z && git push origin vX.Y.Z` triggers `.github/workflows/release.yml`. It builds only tags whose commit is on `master`, and fails if the tag differs from `versionName`. For v1.6.0, once the PR is merged: `git checkout master && git pull && git tag v1.6.0 && git push origin v1.6.0`. The release page then gets the signed APK, AAB and `mapping.txt`. It builds a signed APK and AAB plus the R8 `mapping.txt`, and attaches them to the GitHub release (created if missing).
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` triggers `.github/workflows/release.yml`. It builds only tags whose commit is on `master`, and fails if the tag differs from `versionName`. For v1.7.0, once the PR is merged: `git checkout master && git pull && git tag v1.7.0 && git push origin v1.7.0`. The release page then gets the signed APK, AAB and `mapping.txt`. It builds a signed APK and AAB plus the R8 `mapping.txt`, and attaches them to the GitHub release (created if missing).
 3. To attach builds to an older tag: Actions → Release → Run workflow, enter the tag, and tick `skip_version_check` for tags made before the version was bumped.
 4. Repository secrets used: `ANDROID_KEYSTORE_BASE64` (the upload `.jks`, base64), `KEYSTORE_PASSWORD` (keystore password), `KEY_ALIAS` (key alias), `KEY_PASSWORD` (key password).
 
