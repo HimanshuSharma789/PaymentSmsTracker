@@ -39,6 +39,8 @@ MM-exported rows are kept until you delete them. Admin → Maintenance offers **
 
 ### Manual entry
 
+Home → **Insights** (`InsightsActivity`): read-only month view — total vs last month, spend by category, top 5 merchants. Your share of split bills, Expense rows only, same as Home. Arrows switch months.
+
 Home → **Add transaction** (`TransactionEntryActivity`) with no SMS. Same review/export path.
 
 ### Lists from Home
@@ -83,3 +85,10 @@ On HTTP 401 the app clears cached tokens and asks you to sign in again.
 ## Nightly reminder
 
 If enabled in config, an alarm around the configured hour notifies you to review leftover drafts. Re-scheduled after boot / app update (`BootCompletedReceiver`).
+
+## Own-account payments (card bills)
+
+Admin → Accounts lists every account as a card with a **Count as spending** switch, a trash button, and tap-to-rename; **Add account** appends one. Every change saves immediately (renaming or deleting never touches existing transactions). Turn it off (default for credit-card accounts) and an SMS paid to that account, e.g. "trf to HDFC Bank Credit", is saved as a Transfer-Out to it: not spending, exported to Money Manager as a transfer. **Apply to existing entries** converts matching not-yet-exported Expense rows (splits and exported rows are skipped) after a confirmation showing the count.
+
+
+Admin → Maintenance → **Back up ledger** writes every transaction and merchant memory row to one file (`paymentsms-backup-YYYYMMDD.pstb`) you pick via the system file picker. It is encrypted with a password you choose (PBKDF2-SHA256 + AES-256-GCM); a lost password cannot be recovered. Splitwise tokens and AI keys are never included. **Restore from backup** merges: rows not already on the phone are added (matched by SMS body, bank reference + type, or amount + merchant + time), existing rows are never overwritten, and a result message shows added/skipped counts. Code: `backup/LedgerBackup.kt`. Auto Backup still excludes the database.

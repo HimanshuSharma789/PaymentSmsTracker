@@ -32,5 +32,7 @@
     <!-- Text on the yellow accent stays dark in both themes. -->
     <color name="mono_on_yellow">#121212</color>
     <color name="mono_on_yellow_meta">#4A4633</color>
+    <!-- Switch OFF track: visibly darker than the white card and the off-white bg. -->
+    <color name="mono_switch_off_track">#D9D6CE</color>
     <color name="mono_error">#B42318</color>
 </resources>

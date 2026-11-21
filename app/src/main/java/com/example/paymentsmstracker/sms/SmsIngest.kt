@@ -65,8 +65,10 @@ object SmsIngest {
         val transaction = Transaction(
             amount = parsed.amount,
             merchantName = parsed.merchantName,
-            category = filled.category,
-            subcategory = filled.subcategory,
+            // A detected transfer wins over merchant memory: MerchantMemory only fills blank fields and its
+            // remembered type must not turn a card-bill payment back into an Expense.
+            category = parsed.transferTo.ifEmpty { filled.category },
+            subcategory = if (parsed.transferTo.isNotEmpty()) "" else filled.subcategory,
             account = filled.account,
             timestamp = parsed.timestamp,
             originalSms = body,
